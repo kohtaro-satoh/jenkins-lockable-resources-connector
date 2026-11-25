@@ -1,0 +1,69 @@
+# M0 PoC (docs/PLAN.md §12): checks the runner behaviour the heartbeat daemon
+# design relies on. Run by hand; read each job's summary and logs.
+#
+#   item 1  daemon survives later steps ........ job survive (check step), and
+#           the runner terminates it at the end . "Complete job" log of survive
+#   item 2  post runs on cancel and reads state  workflow m0-poc-cancel.yml, job timeout here
+#   item 3  time to withdraw after the signal ... m0-poc-cancel.yml (summary)
+#   item 4  runs.using: node24 ................. every job (the probe is node24)
+#   item 5  container jobs ...................... job container
+#   item 6  composite wrapper's inner post ...... job composite
+name: M0 PoC
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  survive:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/poc/m0-probe
+      - name: Later step - is the daemon still alive?
+        run: node .github/poc/m0-probe/check.mjs
+      - name: Another later step
+        run: node .github/poc/m0-probe/check.mjs
+
+  timeout:
+    # A step-level timeout cancels main while it waits (E08's scenario).
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/poc/m0-probe
+        timeout-minutes: 1
+        continue-on-error: true
+        with:
+          mode: wait
+
+  container:
+    runs-on: ubuntu-latest
+    container: node:24-bookworm-slim
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/poc/m0-probe
+      - name: Later step - is the daemon still alive?
+        run: node .github/poc/m0-probe/check.mjs
+
+  composite:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/poc/m0-composite
+      - name: Later step - is the daemon still alive?
+        run: node .github/poc/m0-probe/check.mjs
+      # Expect "M0 probe post" in this job's summary if the inner post ran.

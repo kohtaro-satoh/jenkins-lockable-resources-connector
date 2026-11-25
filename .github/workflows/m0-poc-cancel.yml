@@ -1,0 +1,40 @@
+# M0 PoC, items 2 and 3 (docs/PLAN.md §12): cancel the whole run while the
+# probe's main is waiting, then read each wait job's post summary:
+#   - savedStateReadable: post could read main's saveState after the cancel
+#   - signalsReceivedByMain / mainSurvivedAfterFirstSignalMs: how long main has
+#     to withdraw its request before it is killed
+# mode stubborn ignores the signals, so the runner has to kill main; post must
+# still run and read the state.
+name: M0 PoC (cancel)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wait:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        mode: [wait, stubborn]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/poc/m0-probe
+        with:
+          mode: ${{ matrix.mode }}
+
+  cancel:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Give the wait jobs time to start, then cancel the run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sleep 90
+          gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}

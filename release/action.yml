@@ -1,0 +1,30 @@
+name: Jenkins Remote Lockable Resources - release
+description: >-
+  Release a lock taken by kohtaro-satoh/lockable-resources-remote-client-actions.
+  Required: without this step the lease is not released and becomes STALE.
+author: kohtaro-satoh
+branding:
+  icon: unlock
+  color: blue
+
+inputs:
+  lock-id:
+    description: The lock step's lock-id output.
+    required: true
+  server-url:
+    description: >-
+      Same as the lock step. Defaults to the LOCKABLE_RESOURCES_SERVER_URL
+      environment variable.
+    required: false
+  username:
+    description: >-
+      Same as the lock step. Defaults to the LOCKABLE_RESOURCES_USERNAME
+      environment variable.
+    required: false
+  token:
+    description: Same as the lock step. Never read from the environment.
+    required: true
+
+runs:
+  using: node24
+  main: ../dist/release.js
