@@ -29455,9 +29455,15 @@ function daemonFiles(dir, lockId) {
     };
 }
 let tmpCounter = 0;
-/** Write via a temporary file and rename, so readers never see half a file. */
-function writeJsonAtomic(file, data) {
-    fs$1.mkdirSync(path.dirname(file), { recursive: true });
+/**
+ * Write via a temporary file and rename, so readers never see half a file.
+ * With `createDir: false` a missing directory is an error (ENOENT) instead of
+ * being created.
+ */
+function writeJsonAtomic(file, data, options = {}) {
+    if (options.createDir !== false) {
+        fs$1.mkdirSync(path.dirname(file), { recursive: true });
+    }
     const tmp = `${file}.${process.pid}.${tmpCounter++}.tmp`;
     fs$1.writeFileSync(tmp, JSON.stringify(data, null, 2));
     for (let attempt = 1;; attempt++) {

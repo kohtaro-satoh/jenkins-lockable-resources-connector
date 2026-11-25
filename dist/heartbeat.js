@@ -273,9 +273,15 @@ function abbreviate(text) {
 /** Stages in which the daemon should keep sending heartbeats. */
 const ACTIVE_STAGES = new Set(['enqueued', 'held']);
 let tmpCounter = 0;
-/** Write via a temporary file and rename, so readers never see half a file. */
-function writeJsonAtomic(file, data) {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
+/**
+ * Write via a temporary file and rename, so readers never see half a file.
+ * With `createDir: false` a missing directory is an error (ENOENT) instead of
+ * being created.
+ */
+function writeJsonAtomic(file, data, options = {}) {
+    if (options.createDir !== false) {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+    }
     const tmp = `${file}.${process.pid}.${tmpCounter++}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
     for (let attempt = 1;; attempt++) {
@@ -387,7 +393,10 @@ async function runHeartbeatDaemon(cfg, deps) {
     };
     const save = () => {
         try {
-            writeJsonAtomic(cfg.statusFile, status);
+            // Never create the directory: the lock step made it, and once it is
+            // gone the job's temp dir has been removed. Recreating it would leave
+            // files behind (and break a cleanup running at that moment).
+            writeJsonAtomic(cfg.statusFile, status, { createDir: false });
         }
         catch (e) {
             log('WARN', `could not write ${cfg.statusFile}: ${errorMessage(e)}`);

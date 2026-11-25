@@ -31,8 +31,12 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  runner.cleanup()
-  await server.stop()
+  try {
+    await runner.cleanup()
+  } finally {
+    // Always: a server left listening keeps Jest from exiting.
+    await server.stop()
+  }
 })
 
 function connection(): Record<string, string> {

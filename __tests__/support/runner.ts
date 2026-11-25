@@ -30,6 +30,7 @@ export interface RunningStep {
 export class FakeRunner {
   readonly temp: string
   private steps = 0
+  private readonly children: ChildProcess[] = []
 
   private constructor(readonly root: string) {
     this.temp = path.join(root, '_temp')
@@ -88,6 +89,7 @@ export class FakeRunner {
         stdio: ['ignore', 'pipe', 'pipe']
       }
     )
+    this.children.push(child)
     let output = ''
     child.stdout?.on('data', (chunk: Buffer) => (output += chunk.toString()))
     child.stderr?.on('data', (chunk: Buffer) => (output += chunk.toString()))
@@ -140,16 +142,39 @@ export class FakeRunner {
     ) as Record<string, unknown>
   }
 
-  /** What the runner does at the end of the job: kill orphans, empty the temp dir. */
-  cleanup(): void {
-    for (const pid of this.daemonPids()) {
+  /**
+   * What the runner does at the end of the job: kill the orphans outright
+   * (daemons, and steps a failed test left running), then empty the temp dir.
+   * Waits for them to die first, so none writes into the directory while it
+   * is being removed.
+   */
+  async cleanup(): Promise<void> {
+    const pids = [
+      ...this.daemonPids(),
+      ...this.children.flatMap((c) =>
+        c.pid !== undefined && c.exitCode === null && c.signalCode === null
+          ? [c.pid]
+          : []
+      )
+    ]
+    for (const pid of pids) {
       try {
-        process.kill(pid)
+        process.kill(pid, 'SIGKILL')
       } catch {
         // Already gone.
       }
     }
-    fs.rmSync(this.root, { recursive: true, force: true })
+    // Best effort: an unreaped zombie still looks alive.
+    const deadline = Date.now() + 5_000
+    while (pids.some((pid) => isAlive(pid)) && Date.now() < deadline) {
+      await sleep(50)
+    }
+    fs.rmSync(this.root, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100
+    })
   }
 }
 

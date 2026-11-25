@@ -128,6 +128,15 @@ describe('runHeartbeatDaemon', () => {
     expect((await run).stopReason).toBe('state file removed (job finished)')
   })
 
+  it('does not recreate the directory once the temp dir is gone', async () => {
+    const { api } = countingApi(async () => undefined)
+    const run = runHeartbeatDaemon(cfg, { api, clock: systemClock, pid: 1 })
+    await wait(30)
+    fs.rmSync(dir, { recursive: true, force: true })
+    expect((await run).stopReason).toBe('state file removed (job finished)')
+    expect(fs.existsSync(dir)).toBe(false)
+  })
+
   it('stops on a signal', async () => {
     const controller = new AbortController()
     const { api } = countingApi(async () => undefined)

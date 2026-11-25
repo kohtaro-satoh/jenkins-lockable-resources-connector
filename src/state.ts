@@ -98,9 +98,19 @@ export function daemonFiles(
 
 let tmpCounter = 0
 
-/** Write via a temporary file and rename, so readers never see half a file. */
-export function writeJsonAtomic(file: string, data: unknown): void {
-  fs.mkdirSync(path.dirname(file), { recursive: true })
+/**
+ * Write via a temporary file and rename, so readers never see half a file.
+ * With `createDir: false` a missing directory is an error (ENOENT) instead of
+ * being created.
+ */
+export function writeJsonAtomic(
+  file: string,
+  data: unknown,
+  options: { createDir?: boolean } = {}
+): void {
+  if (options.createDir !== false) {
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+  }
   const tmp = `${file}.${process.pid}.${tmpCounter++}.tmp`
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2))
   for (let attempt = 1; ; attempt++) {
