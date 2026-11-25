@@ -1,0 +1,105 @@
+name: Jenkins Remote Lockable Resources
+description: >-
+  Lock resources defined on a Jenkins controller (lockable-resources plugin)
+  from a GitHub Actions job, in the same queue as Jenkins lock() steps. Pair it
+  with the release sub-action.
+author: kohtaro-satoh
+branding:
+  icon: lock
+  color: blue
+
+inputs:
+  server-url:
+    description: >-
+      Root URL of the Jenkins server, including the context path. Defaults to
+      the LOCKABLE_RESOURCES_SERVER_URL environment variable.
+    required: false
+  username:
+    description: >-
+      Jenkins user with the Lockable Resources/RemoteUse permission. Defaults
+      to the LOCKABLE_RESOURCES_USERNAME environment variable.
+    required: false
+  token:
+    description: >-
+      API token of that user (not a password). Never read from the
+      environment; pass it from a secret.
+    required: true
+  client-id:
+    description: >-
+      Identifier shown next to the lock on the Jenkins page. Default:
+      github-actions:<owner>/<repo>.
+    required: false
+  resource:
+    description: Name of the resource to lock (lock() resource).
+    required: false
+  label:
+    description: Label of the resources to lock (lock() label).
+    required: false
+  group:
+    description: >-
+      Resource group (lock() group). Needs lockable-resources 1588 or later.
+    required: false
+  quantity:
+    description: >-
+      Number of resources to lock for a label. 0 (the default) locks all
+      matching resources.
+    required: false
+  variable:
+    description: >-
+      Name of the environment variable that later steps get with the locked
+      resource names (also <variable>0, <variable>0_PROP_<name>, ...). Must
+      not start with GITHUB_ or RUNNER_.
+    required: false
+  inverse-precedence:
+    description: Give the lock to the most recent request first. Default false.
+    required: false
+  resource-select-strategy:
+    description: SEQUENTIAL (default) or RANDOM.
+    required: false
+  skip-if-locked:
+    description: >-
+      Do not wait if the resources are locked: the step succeeds with
+      acquired=false. Default false.
+    required: false
+  extra:
+    description: >-
+      Additional resources to lock at the same time, as a YAML (or JSON) list
+      of mappings with the keys resource, label, quantity and group.
+    required: false
+  priority:
+    description: Queue priority (lock() priority). Default 0.
+    required: false
+  timeout-for-allocate-resource:
+    description: >-
+      Give up waiting after this long (in timeout-unit). 0 (the default) waits
+      forever. Strongly recommended: a request left by a vanished runner then
+      expires on its own.
+    required: false
+  timeout-unit:
+    description: >-
+      Unit of timeout-for-allocate-resource: SECONDS, MINUTES (default),
+      HOURS, DAYS, ...
+    required: false
+  reason:
+    description: >-
+      Reason shown on the Jenkins page. Default: "<workflow> #<run number>
+      (<job>) <run URL>".
+    required: false
+
+outputs:
+  lock-id:
+    description: Lock ID issued by the server. Pass it to the release sub-action.
+  state:
+    description: ACQUIRED or SKIPPED.
+  acquired:
+    description: "'true' when the lock is held, 'false' when it was skipped."
+  resources:
+    description: JSON array of the locked resource names.
+  env-vars:
+    description: JSON object of the environment variables the server returned.
+
+runs:
+  using: node24
+  main: dist/main.js
+  post: dist/post.js
+  post-if: always()

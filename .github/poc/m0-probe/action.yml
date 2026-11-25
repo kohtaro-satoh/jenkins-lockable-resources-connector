@@ -1,0 +1,16 @@
+name: M0 probe
+description: >-
+  Checks the runner behaviour the heartbeat daemon design relies on
+  (docs/PLAN.md §12, M0). Not part of the action.
+inputs:
+  mode:
+    description: >-
+      ready: start the probe daemon and return at once.
+      wait: then sleep until cancelled, recording the signals received.
+      stubborn: like wait, but ignore SIGINT / SIGTERM so the runner has to kill main.
+    default: ready
+runs:
+  using: node24
+  main: main.mjs
+  post: post.mjs
+  post-if: always()
