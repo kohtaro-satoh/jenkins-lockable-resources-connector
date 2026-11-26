@@ -2,7 +2,7 @@
  * Reads the action inputs and checks types and formats only. Whether the
  * combination makes sense (resource and label together, priority with
  * inversePrecedence, no target at all) is left to the server, which answers
- * with the same wording as a local lock() (PLAN §5.2).
+ * with the same wording as a local lock() (docs/design.md §5.2).
  */
 import { CORE_SCHEMA, load } from 'js-yaml'
 import type { Connection } from './client.js'
@@ -164,7 +164,7 @@ export function readReleaseInputs(
   return { ...readConnection(get, env), lockId }
 }
 
-/** `<workflow> #<run_number> (<job>) <run URL>` (PLAN §5.2). */
+/** `<workflow> #<run_number> (<job>) <run URL>` (docs/design.md §5.2). */
 export function defaultReason(env: NodeJS.ProcessEnv): string {
   let reason = env.GITHUB_WORKFLOW || 'GitHub Actions'
   if (env.GITHUB_RUN_NUMBER) reason += ` #${env.GITHUB_RUN_NUMBER}`

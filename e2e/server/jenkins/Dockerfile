@@ -1,4 +1,4 @@
-# The E2E Jenkins (docs/PLAN.md §10.3): Jenkins LTS with one version of
+# The E2E Jenkins (docs/testing.md §4): Jenkins LTS with one version of
 # lockable-resources and the few plugins the tests need. switch.sh builds one
 # image per plugin version; only one runs at a time (1 GB of memory).
 ARG JENKINS_TAG=lts-jdk21

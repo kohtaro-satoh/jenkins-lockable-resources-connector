@@ -1,4 +1,4 @@
-// The two jobs CI starts as e2e-ops (docs/PLAN.md §10.3). Their scripts come
+// The two jobs CI starts as e2e-ops (docs/testing.md §4). Their scripts come
 // from the image (/usr/share/jenkins/e2e), so e2e-ops can run them but not
 // change them.
 //

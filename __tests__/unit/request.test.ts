@@ -142,7 +142,7 @@ describe('buildLockRequestJson: inputs -> lockRequest', () => {
       { label: 'plc', 'resource-select-strategy': '' },
       { group: 'common', label: 'plc' }
     ],
-    // --- priority (differs from Jenkins for negative values, PLAN §11-1)
+    // --- priority (differs from Jenkins for negative values, docs/design.md §10)
     [
       'priority empty',
       { resource: 'r1', priority: '' },

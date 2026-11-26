@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The judge of .github/workflows/e2e.yml (docs/PLAN.md §10.3). Some cases fail
+// The judge of .github/workflows/e2e.yml (docs/testing.md §4). Some cases fail
 // on purpose (a held job that fails must leave a STALE lease), so the run's
 // colour cannot come from the jobs themselves. This compares every job and the
 // steps that matter (post steps included) with what the design expects, reads

@@ -120,7 +120,7 @@ describe('runRelease', () => {
     expect(t.daemon.stopped).toEqual([])
   })
 
-  it('does not release a STALE lease (PLAN §14-6)', async () => {
+  it('does not release a STALE lease (docs/design.md §4.1)', async () => {
     const t = setup('held')
     t.api.statusSteps = [{ lockId: 'lock-1', state: 'STALE' }]
     await runRelease(t.deps)

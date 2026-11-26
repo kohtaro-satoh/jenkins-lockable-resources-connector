@@ -1,4 +1,4 @@
-# End-to-end tests against the E2E Jenkins on the test VPS (docs/PLAN.md §10.3,
+# End-to-end tests against the E2E Jenkins on the test VPS (docs/testing.md §4,
 # e2e/server). Run by hand after `switch.sh <version>` on the server; the
 # input must name the version that is running.
 #

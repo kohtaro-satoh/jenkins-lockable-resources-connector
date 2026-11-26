@@ -1,7 +1,7 @@
 name: M0 probe
 description: >-
   Checks the runner behaviour the heartbeat daemon design relies on
-  (docs/PLAN.md §12, M0). Not part of the action.
+  (docs/testing.md §3, M0). Not part of the action.
 inputs:
   mode:
     description: >-

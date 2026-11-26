@@ -1,4 +1,4 @@
-# M0 PoC (docs/PLAN.md §12): checks the runner behaviour the heartbeat daemon
+# M0 PoC (docs/testing.md §3): checks the runner behaviour the heartbeat daemon
 # design relies on. Run by hand; read each job's summary and logs.
 #
 #   item 1  daemon survives later steps ........ job survive (check step), and

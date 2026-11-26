@@ -1,5 +1,5 @@
 // Remote API, the resources each E2E case uses, and the audit trail
-// (docs/PLAN.md §10.3). Each case has resources of its own, so cases running
+// (docs/testing.md §4). Each case has resources of its own, so cases running
 // in parallel never wait for each other.
 import java.util.logging.FileHandler
 import java.util.logging.Formatter

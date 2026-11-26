@@ -1,4 +1,4 @@
-// Users, API tokens and permissions (docs/PLAN.md §10.3).
+// Users, API tokens and permissions (docs/testing.md §4).
 //
 // The secrets come from the host (secrets.env, made by 04-jenkins.sh) rather
 // than being generated here, so the Jenkins of either plugin version accepts

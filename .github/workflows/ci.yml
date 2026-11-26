@@ -36,7 +36,7 @@ jobs:
           fi
 
   # main -> heartbeat daemon -> release -> post as real processes against the
-  # fake server, on every OS (PLAN §10.2; the fake-server half of E14).
+  # fake server, on every OS (docs/testing.md §2; the fake-server half of E14).
   integration:
     strategy:
       fail-fast: false

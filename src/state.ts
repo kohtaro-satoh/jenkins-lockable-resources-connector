@@ -1,6 +1,6 @@
 /**
  * State shared between main, the heartbeat daemon, the release sub-action and
- * post (PLAN §4.5). core.saveState only reaches the same action's post, and the
+ * post (docs/design.md §4.5). core.saveState only reaches the same action's post, and the
  * release sub-action is a different action, so main writes one file per lock
  * under $RUNNER_TEMP/lockable-resources/. The token is never written anywhere.
  */

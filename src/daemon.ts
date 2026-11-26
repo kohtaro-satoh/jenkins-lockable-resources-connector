@@ -1,5 +1,5 @@
 /**
- * Starting and stopping the heartbeat daemon (PLAN §4.3).
+ * Starting and stopping the heartbeat daemon (docs/design.md §4.3).
  *
  * The daemon is a detached Node process so it outlives the main step. It
  * inherits the environment (including RUNNER_TRACKING_ID, which is how the

@@ -266,7 +266,7 @@ function abbreviate(text) {
 
 /**
  * State shared between main, the heartbeat daemon, the release sub-action and
- * post (PLAN §4.5). core.saveState only reaches the same action's post, and the
+ * post (docs/design.md §4.5). core.saveState only reaches the same action's post, and the
  * release sub-action is a different action, so main writes one file per lock
  * under $RUNNER_TEMP/lockable-resources/. The token is never written anywhere.
  */
@@ -325,7 +325,7 @@ function sleepSync(ms) {
 }
 
 /**
- * Starting and stopping the heartbeat daemon (PLAN §4.3).
+ * Starting and stopping the heartbeat daemon (docs/design.md §4.3).
  *
  * The daemon is a detached Node process so it outlives the main step. It
  * inherits the environment (including RUNNER_TRACKING_ID, which is how the
@@ -350,7 +350,7 @@ const DAEMON_ENV = {
 };
 
 /**
- * The heartbeat daemon's loop (PLAN §4.3, §6).
+ * The heartbeat daemon's loop (docs/design.md §4.3, §6).
  *
  * - The first heartbeat goes out at once, then one every 10 s (fixed delay,
  *   like the Jenkins client).

@@ -1,4 +1,4 @@
-# M0 PoC, items 2 and 3 (docs/PLAN.md §12): cancel the whole run while the
+# M0 PoC, items 2 and 3 (docs/testing.md §3): cancel the whole run while the
 # probe's main is waiting, then read each wait job's post summary:
 #   - savedStateReadable: post could read main's saveState after the cancel
 #   - signalsReceivedByMain / mainSurvivedAfterFirstSignalMs: how long main has
