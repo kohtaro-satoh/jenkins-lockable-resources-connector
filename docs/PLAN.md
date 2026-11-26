@@ -354,7 +354,7 @@ main は lockId ごとの状態ファイル `$RUNNER_TEMP/lockable-resources/<lo
 | `resources` | 取得したリソース名の JSON 配列 |
 | `env-vars` | サーバが返した `lockEnvVars` の JSON |
 
-- `lockEnvVars` の各項目（`PLC`、`PLC0`、`PLC0_PROP_X`、`PLC_PROP_X` …）を `GITHUB_ENV` に書き、後続ステップの
+- `lockEnvVars` の各項目（`PLC`、`PLC0`、`PLC0_X`、`PLC_X` …。X はプロパティ名。`PLC_X` は 1 つ目のリソースのプロパティ）を `GITHUB_ENV` に書き、後続ステップの
   環境変数にする。サーバは `variable` を指定したときだけ名前を載せる。
 - `variable` が `GITHUB_` / `RUNNER_` で始まる場合はエラーにする。GitHub はこれらの変数の上書きを受け付けない。
 - プロパティの値はログに出さない（秘密を入れる運用がありうる）。
@@ -470,14 +470,16 @@ Jenkins クライアント（[`RemoteLockSession`](https://github.com/jenkinsci/
 │   ├── unit/                  # 単体テスト
 │   ├── integration/           # dist を実プロセスで動かす結合テスト
 │   └── support/               # 偽サーバ、ランナーの代役、fake
-├── e2e/                       # Jenkins 起動用の JCasC・init groovy・シナリオ（M3）
+├── e2e/
+│   ├── server/                # E2E 用 VPS の構築一式（Jenkins イメージ、init groovy、管理ジョブ、Caddy、版の切り替え）
+│   └── tools/                 # e2e.yml が使う道具（サーバ状態の確認、管理ジョブの起動、判定）
 ├── .github/
 │   ├── poc/                   # M0 の PoC 用の小さな action
 │   └── workflows/
 │       ├── ci.yml             # lint / test / dist の差分チェック / 3 OS の結合テスト
 │       ├── m0-poc.yml         # M0 の PoC（手動実行）
 │       ├── m0-poc-cancel.yml  # M0 の PoC のうちキャンセル系（手動実行）
-│       └── e2e.yml            # 実 Jenkins に対する E2E（M3）
+│       └── e2e.yml            # VPS 上の実 Jenkins に対する E2E（M3、手動実行）
 └── docs/
     └── PLAN.md                # 本書
 ```
@@ -518,32 +520,104 @@ Jenkins クライアント（[`RemoteLockSession`](https://github.com/jenkinsci/
 
 ### 10.3 E2E（実 Jenkins × GitHub Actions）
 
-`e2e.yml` で Jenkins を Docker で起動する（Jenkins LTS ＋ 指定した版の lockable-resources）。JCasC で
-`remoteApiEnabled` / `exposeLabel` / リソースを定義し、init groovy で RemoteUse ユーザーと API トークンを発行する
-（notes リポジトリの `issue_user_api_token` と同じ手順）。プラグインは 1560 と最新リリースの 2 版で回す。
+（2026-11-26 改訂）当初はジョブごとに Jenkins を Docker で起動する案だったが、テスト専用の VPS に共有の Jenkins を
+置く方式に変えた。別々のジョブが同じ Jenkins に届くので、ジョブ同士の取り合い（E06）、ジョブが終わった後の
+STALE の確認（E09 など）、windows / macos から実 Jenkins を相手にすること（E14）が、模擬ではなく本物になる。
+https・リバースプロキシ・コンテキストパスといった実運用に近い経路も通る。
 
-| ID | 内容 | 確認すること |
+#### 環境
+
+| 項目 | 内容 |
+|---|---|
+| VPS | ConoHa、Ubuntu 26.04、メモリ 1 GB・2 コア・swap 3.8 GB。テストの間だけ動かす使い捨て |
+| 公開 | `https://<E2E のホスト名>/jenkins/`（ホスト名はリポジトリに書かず、Variables とサーバ上の設定にだけ置く）。Caddy が Let's Encrypt で https を終端して Jenkins に中継する。Jenkins のポートは 127.0.0.1 にだけ開く（Docker の公開ポートは ufw を素通りするため） |
+| Jenkins | LTS（JDK 21）を**同時に 1 つだけ**動かす。2 つ分のメモリが無いので、プラグイン 1560 と最新の 2 つのイメージと JENKINS_HOME を用意しておき、SSH 越しのスクリプトで切り替える（URL は同じ）。ヒープは 512 MB 前後 |
+| プラグイン | lockable-resources（版を固定）、Pipeline の最小構成（`workflow-job`・`workflow-cps`・`workflow-basic-steps`。E07 の相手役）、`matrix-auth`、`groovy`（管理ジョブ）。メモリを節約するため JCasC は使わず init groovy で設定する |
+| 設定 | remote API 有効、`exposeLabel` は `e2e`。ケースごとに専用のリソースを用意し、並列に走るケース同士が干渉しないようにする |
+| 構築 | 手順は `e2e/server/` にスクリプトで置き、VPS を作り直しても再現できるようにする |
+
+ユーザーと権限（global matrix）:
+
+| ユーザー | 権限 | 用途 |
 |---|---|---|
-| E01 | resource を指定して取得 → 後続ステップ → release ステップ | サーバで FREE に戻る。post は何もしない |
-| E02 | label + quantity + variable | `X`、`X0`…`Xn`、`X_PROP_*`、`X0_PROP_*` が後続ステップで読める |
-| E03 | extra | 全部まとめて取れる |
-| E04 | skip-if-locked（他が保持中） | SKIPPED、`acquired=false`、`if:` で後続が飛ぶ |
-| E05 | allocate の期限 | `LOCK_WAIT_TIMEOUT` で失敗し、期限どおりに終わる |
-| E06 | 2 ジョブが同じリソースを取り合う | 保持区間が重ならない |
-| E07 | Jenkins パイプラインが持つリソースを Actions が待つ（逆も） | Jenkins と Actions が同じキューで排他される |
-| E08 | 待機中に止める（ロックのステップに `timeout-minutes` を付けて打ち切る） | サーバに QUEUED が残らない（取り下げ） |
-| E09 | 保持中に後続ステップが失敗する | release されず、約 60 秒後にサーバで STALE。後片付けはテストの最後に管理者として行う |
-| E10 | 保持中に 70 秒以上かかる後続ステップ | STALE にならない（デーモンが生きている） |
-| E11 | release ステップを書き忘れた成功ジョブ | post がジョブを失敗にし、STALE になる |
-| E12 | `acceptNewAcquires=false` → 再開 | 待ってから取れる |
-| E13 | 公開していないリソース、誤ったトークン | 404 / 403 ですぐ失敗 |
-| E14 | ubuntu / windows / macos で E01・E10 | デーモン方式がどの OS でも動く |
-| E15 | 保持中にワークフローをキャンセルする | E09 と同じく release されず STALE |
-| E16 | release ステップに `if: always()` を付け、保持中に後続ステップが失敗する | release される（Jenkins の `lock()` と同じ挙動を選べる） |
+| `e2e-robot` | Overall/Read、Lockable Resources/RemoteUse | アクションが使う。README で勧める最小権限そのもの |
+| `e2e-ops` | Overall/Read、Job/Read、Job/Build | 管理ジョブと相手役のパイプラインを起動する |
+| `e2e-norights` | Overall/Read のみ | 403 の確認（E13） |
+| `admin` | 全権 | SSH 越しの保守だけで使う。CI には渡さない |
 
-- GitHub ホストランナーで Docker が使えるのは Linux だけなので、E14 の windows / macos は偽サーバ（10.2）を相手にする。
-- 重なりの判定はサーバ側の記録で行う。クライアントのログに出る区間は実際の区間の部分集合なので、
-  クライアントのログだけでは「重なっていない」ことを示せない。
+**管理ジョブ（`e2e-admin`）**: テストには管理者の操作が要る（STALE の後片付け、`acceptNewAcquires` の切り替え、
+監査ログや待ち行列の読み出し）。admin の token を CI に渡すと、漏れたときにスクリプトコンソール経由で VPS を
+乗っ取られうる。そこで決まった操作だけをする Freestyle ジョブ（system Groovy）を置き、CI は `e2e-ops` で
+`OP` パラメータを付けて起動し、結果をコンソール出力から読む。`e2e-ops` は Job/Configure を持たないので
+スクリプトは変えられない。パラメータは許した値（`e2e-` で始まるリソース名など）だけを受け付ける。
+
+| OP | 内容 |
+|---|---|
+| `version` | 動いている lockable-resources の版を返す。ワークフローの入力と照合する |
+| `reset` | `e2e-` で始まるリソースのリモートの lease と待ちをすべて解放し、`acceptNewAcquires` を true に戻し、相手役のビルドを止める |
+| `queue` | 指定したリソースを待っている要求の数 |
+| `accept` | `acceptNewAcquires` を true / false にする |
+| `release-stale` | STALE の lease を管理者として解放する（後片付け） |
+| `audit` | 指定した時刻以降の監査ログ（`LRA|…` の行）を返す |
+
+監査ログは、プラグインの `org.jenkins.plugins.lockableresources.audit` ロガー（1560 にもある）を FINE にして
+ファイルに書かせる。資源が二重に保持されていないことはクライアントのログでは示せない（クライアントのログに出る
+区間は実際の区間の部分集合）ので、この記録で判定する。
+
+#### ワークフロー（`e2e.yml`）
+
+- `workflow_dispatch` だけで走らせる。入力はプラグインの版（`1560` / `latest`）で、最初に `OP=version` と照合し、
+  違えば止める
+- `concurrency` で E2E の run を 1 本ずつにする（Jenkins は共有なので）
+- 接続先と token はリポジトリの Variables / Secrets に置く（`E2E_SERVER_URL`、`E2E_ROBOT_TOKEN` など）。
+  ホスト名をワークフローに書かない
+- 段階:
+  1. `preflight`: 版の照合、`OP=reset`、開始時刻の記録
+  2. 並列: 下表で「並列」のジョブ
+  3. 直列: E12。`acceptNewAcquires` を止めると全体に効くので、ほかと同時に走らせない
+  4. `verify-failures`: 失敗系のジョブが出力した lockId について、サーバでの状態（STALE / 解放済み）を確かめる。
+     最後に `OP=release-stale`
+  5. `judge`: 各ジョブ・各ステップ（post を含む）の成否を API で取り、期待値の表と照合する。想定どおりに失敗する
+     ジョブには job レベルの `continue-on-error` を付け、run 全体の緑・赤は judge で決まるようにする
+  6. `cleanup`（`always()`）: `OP=reset`
+
+#### ケース
+
+| ID | 内容 | 確認すること | ランナー | 段階 |
+|---|---|---|---|---|
+| E01 | resource を指定して取得 → 後続ステップ → release | サーバで FREE に戻る。post は何もしない | ubuntu / windows / macos | 並列 |
+| E02 | label + quantity + variable、プロパティ付きのリソース | `X`、`X0`…、`X0_<プロパティ名>`、`X_<プロパティ名>` が後続ステップで読め、`env-vars` 出力と一致する。プロパティの値がロックのステップのログに出ない（judge がログを取って調べる） | ubuntu / windows / macos | 並列 |
+| E03 | extra（最新版では group も） | 全部まとめて取れる | ubuntu | 並列 |
+| E04 | skip-if-locked（前のステップが保持中のリソース） | SKIPPED、`acquired=false`、`if:` で後続が飛ぶ | ubuntu | 並列 |
+| E05 | allocate の期限（保持中のリソースを 20 秒の期限で要求） | `LOCK_WAIT_TIMEOUT` で失敗し、20 秒前後で終わる | ubuntu | 並列 |
+| E06 | 4 ジョブが同じリソースを取り合う（それぞれ 20 秒保持） | 4 つとも取れる。監査ログで保持区間が重ならない | ubuntu ×2 / windows / macos | 並列 |
+| E06p | 保持中のリソースを priority 0 と 10 の 2 ジョブが待つ | 10 が先に取れる | ubuntu ×3 | 並列 |
+| E07 | Jenkins パイプラインが持つリソースを Actions が待つ。逆も | 同じキューで排他される（監査ログで順序と重なりを確かめる） | ubuntu | 並列 |
+| E08 | 待機中にロックのステップを `timeout-minutes` で打ち切る | main がシグナルを受けて取り下げ、サーバに待ちが残らない（`OP=queue` が 0） | ubuntu / windows / macos | 並列 |
+| E09 | 保持中に後続ステップが失敗する | release されず、ジョブの後に STALE | ubuntu | 並列 |
+| E10 | 保持中に 75 秒かかる後続ステップ | STALE にならない（デーモンが生きている） | ubuntu / windows / macos | 並列 |
+| E11 | release を書き忘れた成功ジョブ | post がジョブを失敗にし、STALE になる | ubuntu | 並列 |
+| E12 | `acceptNewAcquires=false` にして要求し、30 秒後に再開する（再開は裏で起動しておく） | 503 の間待って、再開後に取れる | ubuntu | 直列 |
+| E13 | 公開していないリソース、誤った token、RemoteUse の無いユーザー、http:// の URL（https へのリダイレクト）、誤ったコンテキストパス | 404 / 401 / 403 / リダイレクト / 404 で、ヒント付きですぐ失敗する | ubuntu | 並列 |
+| E14 | — | E01・E02・E08・E10 を 3 OS で回すことで兼ねる | — | — |
+| E15 | 保持中の後続ステップを `timeout-minutes` で打ち切る | E09 と同じく release されず STALE。run 全体のキャンセルでも post が走ることは M0 で確かめた | ubuntu | 並列 |
+| E16 | release ステップに `if: always()`、保持中に後続ステップが失敗する | release され FREE に戻る（Jenkins の `lock()` と同じ挙動を選べる） | ubuntu | 並列 |
+| E17 | 保持中にデーモンを殺し、70 秒待ってから release | release ステップが STALE を見つけ、解放せずに失敗する（§14 の 6） | ubuntu | 並列 |
+| E18 | 保持中と release 中に、ランナー側の iptables でサーバへの通信を止める（保持中 30 秒、release 中 15 秒） | heartbeat の失敗は警告になるが lease は生き残る。release は再送して成功する（§14 の 5） | ubuntu | 並列 |
+
+- ジョブの開始時刻は数十秒ずれる。順序を見るケース（E06p、E07）は、保持役がリソースを取ってから待ち手が要求し、
+  保持役は `OP=queue` で待ちがそろうのを確かめてから解放する。開始時刻のずれに左右されない
+- 想定どおりに失敗するのは E09・E11・E15・E16（後続ステップが失敗する）・E17。E05・E13 は失敗するステップを
+  ステップ単位の `continue-on-error` で受け、結果と所要時間を確かめる
+- 1 run の目安は 10〜15 分。プラグインの版を切り替えてもう 1 run 回す
+- 並列のジョブは十数本になるが、サーバへの負荷は 3 秒ごとのポーリングと 10 秒ごとの heartbeat なので、
+  1 GB の VPS でも問題にならない
+
+#### やらないこと
+
+- 優先度以外の並び順（inversePrecedence など）の網羅: サーバの責任で、プラグインのテストが持つ
+- Jenkins の再起動をまたぐ挙動: lease の記録はメモリにあり、再起動で消える（プラグインの挙動）
+- self-hosted runner の確認: 公開リポジトリで self-hosted runner を使うのは危ないので、この VPS には置かない
 
 ---
 
@@ -566,7 +640,7 @@ Jenkins クライアント（[`RemoteLockSession`](https://github.com/jenkinsci/
 | M0 | PoC: 設計の前提を確かめる | 下の 6 点を ubuntu / windows / macos で確かめた結果が本書に反映されている |
 | M1 | 中核（`client` / `request` / `session` / `inputs`） | 単体テストが通る。入力の対応表のケースがすべて通る |
 | M2 | main / post / デーモン / release サブアクション | 偽サーバでの結合テストが通る |
-| M3 | E2E ワークフロー | E01〜E16 がすべて通る（プラグイン 1560 と最新の 2 版） |
+| M3 | E2E ワークフロー | E01〜E18 がすべて通る（プラグイン 1560 と最新の 2 版。§10.3 の VPS 上の Jenkins） |
 | M4 | ドキュメントとリリース | README（英語）、使用例、`v1.0.0` タグと `v1` の移動タグ、Marketplace に出すかの判断 |
 
 M0 で確かめること:

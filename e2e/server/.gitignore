@@ -1,0 +1,3 @@
+# Made on the server; never commit them.
+.env
+secrets.env

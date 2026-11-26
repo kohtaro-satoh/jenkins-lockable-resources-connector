@@ -147,9 +147,9 @@ expires on its own.
 | `resources` | JSON array of the locked resource names   |
 | `env-vars`  | JSON object of the server's `lockEnvVars` |
 
-With `variable: PLC`, later steps get `PLC`, `PLC0`, `PLC0_PROP_<name>`, ... as
-environment variables, as in a Jenkins `lock()` block. Property values are
-never printed.
+With `variable: PLC`, later steps get `PLC`, `PLC0`, `PLC0_<property>` and
+`PLC_<property>` (the first resource's properties), ... as environment
+variables, as in a Jenkins `lock()` block. Property values are never printed.
 
 ## Limits
 
