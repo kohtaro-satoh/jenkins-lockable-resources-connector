@@ -262,4 +262,7 @@ The end-to-end tests need a Jenkins of their own; see
 
 ## License
 
-MIT
+[MIT](LICENSE). The bundle in `dist/` includes third-party packages, all under
+the MIT License; their notices are in [dist/licenses.txt](dist/licenses.txt),
+which `npm run package` regenerates. A bundled package under a licence outside
+a short permissive list (MIT, ISC, BSD, Apache-2.0) fails the build.

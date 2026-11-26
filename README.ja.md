@@ -235,4 +235,6 @@ E2E テストには専用の Jenkins が要ります。[e2e/server/README.ja.md]
 
 ## ライセンス
 
-MIT
+[MIT](LICENSE)。`dist/` のバンドルには他者のパッケージ（すべて MIT License）が含まれ、その著作権表示とライセンス文は
+[dist/licenses.txt](dist/licenses.txt) にある。このファイルは `npm run package` が作り直す。
+許可した寛容なライセンス（MIT、ISC、BSD、Apache-2.0）以外のパッケージが混ざるとビルドが失敗する。
