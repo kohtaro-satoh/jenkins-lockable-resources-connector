@@ -1,0 +1,18 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<!--
+  The first config.xml of a new JENKINS_HOME: security on, anonymous denied,
+  and no users yet. Jenkins starts locked; 10-security.groovy then adds the
+  users and the permission matrix. If that script fails, Jenkins stays locked
+  rather than open (the setup wizard is off, which would otherwise leave a new
+  Jenkins unsecured).
+-->
+<hudson>
+  <useSecurity>true</useSecurity>
+  <authorizationStrategy class="hudson.security.FullControlOnceLoggedInAuthorizationStrategy">
+    <denyAnonymousReadAccess>true</denyAnonymousReadAccess>
+  </authorizationStrategy>
+  <securityRealm class="hudson.security.HudsonPrivateSecurityRealm">
+    <disableSignup>true</disableSignup>
+    <enableCaptcha>false</enableCaptcha>
+  </securityRealm>
+</hudson>

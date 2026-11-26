@@ -1,0 +1,26 @@
+# The E2E Jenkins (docs/PLAN.md §10.3). One at a time: switch.sh sets LR in
+# .env to the plugin version to run, and each version keeps its own
+# JENKINS_HOME. Published on 127.0.0.1 only; Caddy is the way in.
+name: lrrc-e2e
+
+services:
+  jenkins:
+    image: lrrc-e2e-jenkins:${LR:?run switch.sh first}
+    container_name: lrrc-e2e-jenkins
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8080:8080'
+    env_file: secrets.env
+    environment:
+      E2E_DOMAIN: ${E2E_DOMAIN:?set in .env}
+      # Fits 1 GB of memory (plus swap): small heap, serial GC.
+      JAVA_OPTS: >-
+        -Xms256m -Xmx448m -XX:+UseSerialGC
+        -Djenkins.install.runSetupWizard=false
+        -Dhudson.model.UsageStatistics.disabled=true
+    volumes:
+      - home-${LR}:/var/jenkins_home
+
+volumes:
+  home-1560: {}
+  home-latest: {}
