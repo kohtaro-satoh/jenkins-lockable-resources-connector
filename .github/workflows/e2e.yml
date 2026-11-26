@@ -1,0 +1,820 @@
+# End-to-end tests against the E2E Jenkins on the test VPS (docs/PLAN.md §10.3,
+# e2e/server). Run by hand after `switch.sh <version>` on the server; the
+# input must name the version that is running.
+#
+# Several cases fail on purpose (a held job that fails must leave a STALE
+# lease). Those jobs carry continue-on-error, and the judge job compares every
+# job and step with what the design expects and reads the server's audit trail.
+# The run is green when the judge is.
+name: E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: lockable-resources version running on the E2E server
+        type: choice
+        options: [latest, '1560']
+        default: latest
+
+# One run at a time: the Jenkins is shared.
+concurrency:
+  group: e2e
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # The action reads these two; the token only ever comes from `with: token`.
+  LOCKABLE_RESOURCES_SERVER_URL: ${{ vars.E2E_SERVER_URL }}
+  LOCKABLE_RESOURCES_USERNAME: e2e-robot
+  # For e2e/tools/e2e.mjs (server state, e2e-admin, e2e-holder).
+  E2E_SERVER_URL: ${{ vars.E2E_SERVER_URL }}
+  E2E_ROBOT_TOKEN: ${{ secrets.E2E_ROBOT_TOKEN }}
+  E2E_OPS_TOKEN: ${{ secrets.E2E_OPS_TOKEN }}
+  E2E: node e2e/tools/e2e.mjs
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      since: ${{ steps.pre.outputs.since }}
+      version: ${{ steps.pre.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check the plugin version and reset the server
+        id: pre
+        run: $E2E preflight '${{ inputs.plugin }}'
+
+  # E01 E02 E10 on every OS (E14).
+  basic:
+    name: E01 E02 E10 (${{ matrix.key }})
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, key: ubuntu }
+          - { os: windows-latest, key: windows }
+          - { os: macos-latest, key: macos }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: E01 lock
+        id: e01
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-basic-${{ matrix.key }}
+          timeout-for-allocate-resource: 5
+      - name: E01 check held
+        run: |
+          test '${{ steps.e01.outputs.state }}' = ACQUIRED
+          test '${{ steps.e01.outputs.acquired }}' = true
+          test '${{ steps.e01.outputs.resources }}' = '["e2e-basic-${{ matrix.key }}"]'
+          $E2E resource e2e-basic-${{ matrix.key }} LOCKED
+          $E2E lock '${{ steps.e01.outputs.lock-id }}' ACQUIRED
+      - name: E01 release
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.e01.outputs.lock-id }}
+      - name: E01 check free
+        run: |
+          $E2E resource e2e-basic-${{ matrix.key }} FREE
+          $E2E lock '${{ steps.e01.outputs.lock-id }}' FAILED/RELEASED
+
+      - run: echo "E2E-MARK E02-lock"
+      - name: E02 lock
+        id: e02
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          label: e2e-pool-${{ matrix.key }}
+          quantity: 2
+          variable: POOL
+          timeout-for-allocate-resource: 5
+      - run: echo "E2E-MARK E02-lock-end"
+      - name: E02 check environment variables
+        env:
+          ENV_VARS: ${{ steps.e02.outputs.env-vars }}
+          KEY: ${{ matrix.key }}
+        run: node e2e/tools/check-env.mjs
+      - name: E02 release
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.e02.outputs.lock-id }}
+
+      - name: E10 lock
+        id: e10
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-long-${{ matrix.key }}
+          timeout-for-allocate-resource: 5
+      - name: E10 hold for 75 s (longer than the 60 s STALE threshold)
+        run: sleep 75
+      - name: E10 check still held
+        run: $E2E lock '${{ steps.e10.outputs.lock-id }}' ACQUIRED
+      - name: E10 release
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.e10.outputs.lock-id }}
+      - name: E10 check free
+        run: $E2E resource e2e-long-${{ matrix.key }} FREE
+
+  semantics:
+    name: E03 E04 E05 E13
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: E03 lock (resource + extra)
+        id: e03
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-extra-1
+          extra: |
+            - label: e2e-xpool
+              quantity: 2
+          timeout-for-allocate-resource: 5
+      - name: E03 check
+        run: |
+          node -e '
+            const got = JSON.parse(process.argv[1]).sort()
+            const want = ["e2e-extra-1", "e2e-xpool-1", "e2e-xpool-2"]
+            if (JSON.stringify(got) !== JSON.stringify(want)) { console.error("got", got); process.exit(1) }
+          ' '${{ steps.e03.outputs.resources }}'
+          for r in e2e-extra-1 e2e-xpool-1 e2e-xpool-2; do $E2E resource $r LOCKED; done
+      - name: E03 release
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.e03.outputs.lock-id }}
+      - name: E03 check free
+        run: for r in e2e-extra-1 e2e-xpool-1 e2e-xpool-2; do $E2E resource $r FREE; done
+
+      - name: E04 hold
+        id: hold4
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-busy-1
+          timeout-for-allocate-resource: 5
+      - name: E04 lock (skip-if-locked)
+        id: e04
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-busy-1
+          skip-if-locked: true
+      - name: E04 check skipped
+        run: |
+          test '${{ steps.e04.outputs.state }}' = SKIPPED
+          test '${{ steps.e04.outputs.acquired }}' = false
+          test '${{ steps.e04.outputs.resources }}' = '[]'
+      - name: E04 must be skipped
+        if: steps.e04.outputs.acquired == 'true'
+        run: exit 1
+      - name: E04 release the skipped lock (does nothing)
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.e04.outputs.lock-id }}
+      - name: E04 release hold
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.hold4.outputs.lock-id }}
+
+      - name: E05 hold
+        id: hold5
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-busy-2
+          timeout-for-allocate-resource: 5
+      - name: E05 start
+        id: t5
+        run: |
+          echo "t=$(date +%s)" >> "$GITHUB_OUTPUT"
+          echo "E2E-MARK E05-lock"
+      - name: E05 lock (times out after 20 s)
+        id: e05
+        continue-on-error: true
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-busy-2
+          timeout-for-allocate-resource: 20
+          timeout-unit: SECONDS
+      - run: echo "E2E-MARK E05-lock-end"
+      - name: E05 check
+        run: |
+          test '${{ steps.e05.outcome }}' = failure
+          elapsed=$(( $(date +%s) - ${{ steps.t5.outputs.t }} ))
+          echo "failed after ${elapsed}s (the server checks the deadline every 15 s)"
+          test "$elapsed" -ge 18 && test "$elapsed" -le 60
+          $E2E lock '${{ steps.e05.outputs.lock-id }}' FAILED/LOCK_WAIT_TIMEOUT
+      - name: E05 release hold
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.hold5.outputs.lock-id }}
+
+      - name: E13 start
+        id: t13
+        run: |
+          echo "t=$(date +%s)" >> "$GITHUB_OUTPUT"
+          echo "http=${E2E_SERVER_URL/https:/http:}" >> "$GITHUB_OUTPUT"
+          echo "wrongpath=${E2E_SERVER_URL%/*}/no-such-context" >> "$GITHUB_OUTPUT"
+          echo "E2E-MARK E13-unexposed"
+      - name: E13 resource that is not exposed
+        id: e13a
+        continue-on-error: true
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: private-1
+      - run: echo "E2E-MARK E13-bad-token"
+      - name: E13 wrong token
+        id: e13b
+        continue-on-error: true
+        uses: ./
+        with:
+          token: not-a-valid-api-token
+          resource: e2e-busy-1
+      - run: echo "E2E-MARK E13-norights"
+      - name: E13 user without RemoteUse
+        id: e13c
+        continue-on-error: true
+        uses: ./
+        with:
+          username: e2e-norights
+          token: ${{ secrets.E2E_NORIGHTS_TOKEN }}
+          resource: e2e-busy-1
+      - run: echo "E2E-MARK E13-http"
+      - name: E13 http:// URL (the server redirects to https)
+        id: e13d
+        continue-on-error: true
+        uses: ./
+        with:
+          server-url: ${{ steps.t13.outputs.http }}
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-busy-1
+      - run: echo "E2E-MARK E13-context-path"
+      - name: E13 wrong context path
+        id: e13e
+        continue-on-error: true
+        uses: ./
+        with:
+          server-url: ${{ steps.t13.outputs.wrongpath }}
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-busy-1
+      - run: echo "E2E-MARK E13-end"
+      - name: E13 check (all five failed, and fast)
+        run: |
+          for o in '${{ steps.e13a.outcome }}' '${{ steps.e13b.outcome }}' '${{ steps.e13c.outcome }}' \
+                   '${{ steps.e13d.outcome }}' '${{ steps.e13e.outcome }}'; do
+            test "$o" = failure
+          done
+          elapsed=$(( $(date +%s) - ${{ steps.t13.outputs.t }} ))
+          echo "five refusals in ${elapsed}s"
+          test "$elapsed" -le 60
+          $E2E resource e2e-busy-1 FREE
+
+  # E06: four jobs on three OSes take turns on one resource.
+  e06:
+    name: E06 (${{ matrix.n }})
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, n: 1 }
+          - { os: ubuntu-latest, n: 2 }
+          - { os: windows-latest, n: 3 }
+          - { os: macos-latest, n: 4 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - name: E06 lock
+        id: lock
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-shared-1
+          client-id: e2e-e06-${{ matrix.n }}
+          timeout-for-allocate-resource: 8
+      - name: E06 hold for 20 s
+        run: sleep 20
+      - name: E06 release
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.lock.outputs.lock-id }}
+
+  # E06p: while the holder keeps the resource, priority 0 asks first and
+  # priority 10 second; 10 must be served first.
+  e06p-holder:
+    name: E06p holder
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: E06p hold
+        id: lock
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-shared-2
+          client-id: e2e-e06p-holder
+          timeout-for-allocate-resource: 5
+      - name: E06p wait for both requests
+        run: E2E_TIMEOUT=360 $E2E wait-queue e2e-shared-2 2
+      - name: E06p release
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.lock.outputs.lock-id }}
+
+  e06p-low:
+    name: E06p low (priority 0)
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      lock-id: ${{ steps.lock.outputs.lock-id }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: E06p wait for the holder
+        run: E2E_TIMEOUT=300 $E2E resource e2e-shared-2 LOCKED
+      - name: E06p lock (priority 0)
+        id: lock
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-shared-2
+          client-id: e2e-e06p-low
+          timeout-for-allocate-resource: 8
+      - run: sleep 3
+      - name: E06p release
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.lock.outputs.lock-id }}
+
+  e06p-high:
+    name: E06p high (priority 10)
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      lock-id: ${{ steps.lock.outputs.lock-id }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: E06p wait for the priority 0 request
+        run: E2E_TIMEOUT=300 $E2E wait-queue e2e-shared-2 1
+      - name: E06p lock (priority 10)
+        id: lock
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-shared-2
+          client-id: e2e-e06p-high
+          priority: 10
+          timeout-for-allocate-resource: 8
+      - run: sleep 3
+      - name: E06p release
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.lock.outputs.lock-id }}
+
+  # E07: one queue for Jenkins lock() and the action, in both directions.
+  e07:
+    name: E07
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: E07 a Jenkins pipeline holds e2e-interop-1 for 20 s
+        id: h1
+        run: $E2E holder e2e-interop-1 20 held
+      - name: E07 lock (waits for the pipeline)
+        id: a1
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-interop-1
+          timeout-for-allocate-resource: 5
+      - name: E07 check the pipeline finished
+        run: $E2E holder-done ${{ steps.h1.outputs.number }}
+      - name: E07 release e2e-interop-1
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.a1.outputs.lock-id }}
+
+      - name: E07 lock e2e-interop-2
+        id: a2
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-interop-2
+          timeout-for-allocate-resource: 5
+      - name: E07 a Jenkins pipeline asks for e2e-interop-2
+        id: h2
+        run: |
+          $E2E holder e2e-interop-2 1 waiting
+          $E2E wait-queue e2e-interop-2 1
+          sleep 5
+      - name: E07 release e2e-interop-2
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.a2.outputs.lock-id }}
+      - name: E07 check the pipeline got it afterwards
+        run: $E2E holder-done ${{ steps.h2.outputs.number }}
+
+  # E08: a waiting lock step cut off by timeout-minutes withdraws its request.
+  e08:
+    name: E08 (${{ matrix.key }})
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, key: ubuntu }
+          - { os: windows-latest, key: windows }
+          - { os: macos-latest, key: macos }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: E08 hold
+        id: hold
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-cancel-${{ matrix.key }}
+          timeout-for-allocate-resource: 5
+      - name: E08 lock (cut off while waiting)
+        id: e08
+        continue-on-error: true
+        timeout-minutes: 1
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-cancel-${{ matrix.key }}
+          timeout-for-allocate-resource: 5
+      - name: E08 check withdrawn
+        run: |
+          test '${{ steps.e08.outcome }}' = failure
+          # Before the post step: main itself withdrew on the runner's signal.
+          $E2E admin queue e2e-cancel-${{ matrix.key }} | tee queue.txt
+          grep -qx 'queue=0' queue.txt
+          id='${{ steps.e08.outputs.lock-id }}'
+          if [ -n "$id" ]; then $E2E lock "$id" FAILED/RELEASED,GONE; fi
+      - name: E08 release hold
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.hold.outputs.lock-id }}
+      - name: E08 check free
+        run: $E2E resource e2e-cancel-${{ matrix.key }} FREE
+
+  # E09 E11 E15 E16 E17 fail on purpose; verify-failures and the judge check
+  # what they left on the server.
+  e09:
+    name: E09
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    outputs:
+      lock-id: ${{ steps.lock.outputs.lock-id }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: E09 lock
+        id: lock
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-fail-1
+          timeout-for-allocate-resource: 5
+      - name: E09 fail on purpose
+        run: exit 1
+      - name: E09 release (skipped)
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.lock.outputs.lock-id }}
+
+  e11:
+    name: E11
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    outputs:
+      lock-id: ${{ steps.lock.outputs.lock-id }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: E11 lock
+        id: lock
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-fail-2
+          timeout-for-allocate-resource: 5
+      - name: E11 work, no release step
+        run: sleep 5
+
+  e15:
+    name: E15
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    outputs:
+      lock-id: ${{ steps.lock.outputs.lock-id }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: E15 lock
+        id: lock
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-fail-3
+          timeout-for-allocate-resource: 5
+      - name: E15 held step times out
+        timeout-minutes: 1
+        run: sleep 300
+      - name: E15 release (skipped)
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.lock.outputs.lock-id }}
+
+  e16:
+    name: E16
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    outputs:
+      lock-id: ${{ steps.lock.outputs.lock-id }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: E16 lock
+        id: lock
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-fail-4
+          timeout-for-allocate-resource: 5
+      - name: E16 fail on purpose
+        run: exit 1
+      - name: E16 release (always)
+        if: always()
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.lock.outputs.lock-id }}
+      - name: E16 check free
+        if: always()
+        run: $E2E resource e2e-fail-4 FREE
+
+  e17:
+    name: E17
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    continue-on-error: true
+    outputs:
+      lock-id: ${{ steps.lock.outputs.lock-id }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: E17 lock
+        id: lock
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-fail-5
+          timeout-for-allocate-resource: 5
+      - name: E17 kill the heartbeat daemon
+        run: |
+          pkill -f 'dist/heartbeat.js'
+          sleep 1
+          ! pgrep -f 'dist/heartbeat.js'
+      - name: E17 wait for STALE
+        run: E2E_TIMEOUT=120 $E2E lock '${{ steps.lock.outputs.lock-id }}' STALE
+      - run: echo "E2E-MARK E17-release"
+      - name: E17 release (must refuse)
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.lock.outputs.lock-id }}
+      - if: always()
+        run: echo "E2E-MARK E17-release-end"
+      - name: E17 check still STALE
+        if: always()
+        run: $E2E lock '${{ steps.lock.outputs.lock-id }}' STALE
+
+  # E18: the runner loses the server for a while (iptables on the runner side).
+  e18:
+    name: E18
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: E18 lock
+        id: lock
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-net-1
+          timeout-for-allocate-resource: 5
+      - name: E18 cut the server off for 30 s while held
+        id: cut
+        run: |
+          echo "E2E-MARK E18-cut"
+          host=$(node -p 'new URL(process.env.E2E_SERVER_URL).hostname')
+          ip=$(getent ahostsv4 "$host" | awk 'NR==1 {print $1}')
+          echo "ip=$ip" >> "$GITHUB_OUTPUT"
+          sudo iptables -I OUTPUT -d "$ip" -p tcp -j REJECT --reject-with tcp-reset
+          sleep 30
+          sudo iptables -D OUTPUT -d "$ip" -p tcp -j REJECT --reject-with tcp-reset
+      - name: E18 check the lease survived and the daemon saw the failures
+        run: |
+          $E2E lock '${{ steps.lock.outputs.lock-id }}' ACQUIRED
+          node -e '
+            const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))
+            console.log(`failCount=${s.failCount} okCount=${s.okCount} lastError=${s.lastError ?? ""}`)
+            if (!(s.failCount > 0)) process.exit(1)
+          ' "$RUNNER_TEMP/lockable-resources/${{ steps.lock.outputs.lock-id }}.heartbeat.json"
+      - name: E18 cut the server off again; restore it in 15 s
+        run: |
+          ip='${{ steps.cut.outputs.ip }}'
+          sudo iptables -I OUTPUT -d "$ip" -p tcp -j REJECT --reject-with tcp-reset
+          nohup bash -c "sleep 15; sudo iptables -D OUTPUT -d $ip -p tcp -j REJECT --reject-with tcp-reset" >/dev/null 2>&1 &
+          echo "E2E-MARK E18-release"
+      - name: E18 release (retries until the server is back)
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.lock.outputs.lock-id }}
+      - run: echo "E2E-MARK E18-release-end"
+      - name: E18 check free
+        run: $E2E resource e2e-net-1 FREE
+
+  # E12 pauses the whole server, so it runs after the parallel cases.
+  e12:
+    name: E12
+    needs:
+      [
+        preflight,
+        basic,
+        semantics,
+        e06,
+        e06p-holder,
+        e06p-low,
+        e06p-high,
+        e07,
+        e08,
+        e09,
+        e11,
+        e15,
+        e16,
+        e17,
+        e18
+      ]
+    if: always() && needs.preflight.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v5
+      - name: E12 stop accepting new requests; resume in 30 s
+        id: t12
+        run: |
+          $E2E admin accept false
+          nohup bash -c 'sleep 30; node e2e/tools/e2e.mjs admin accept true' >"$RUNNER_TEMP/e12-resume.log" 2>&1 &
+          echo "t=$(date +%s)" >> "$GITHUB_OUTPUT"
+          echo "E2E-MARK E12-lock"
+      - name: E12 lock (waits for the server to resume)
+        id: e12
+        uses: ./
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          resource: e2e-maint-1
+          timeout-for-allocate-resource: 3
+      - run: echo "E2E-MARK E12-lock-end"
+      - name: E12 check
+        run: |
+          elapsed=$(( $(date +%s) - ${{ steps.t12.outputs.t }} ))
+          echo "acquired after ${elapsed}s"
+          cat "$RUNNER_TEMP/e12-resume.log"
+          test "$elapsed" -ge 25
+          $E2E lock '${{ steps.e12.outputs.lock-id }}' ACQUIRED
+      - name: E12 release
+        uses: ./release
+        with:
+          token: ${{ secrets.E2E_ROBOT_TOKEN }}
+          lock-id: ${{ steps.e12.outputs.lock-id }}
+      - name: E12 make sure the server accepts requests again
+        if: always()
+        run: $E2E admin accept true
+
+  verify-failures:
+    needs: [preflight, e09, e11, e15, e16, e17]
+    if: always() && needs.preflight.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - name: E09 E11 E15 leases became STALE
+        run: |
+          for id in '${{ needs.e09.outputs.lock-id }}' '${{ needs.e11.outputs.lock-id }}' '${{ needs.e15.outputs.lock-id }}'; do
+            test -n "$id"
+            E2E_TIMEOUT=150 $E2E lock "$id" STALE
+          done
+      - name: E16 lease released
+        if: always()
+        run: |
+          $E2E resource e2e-fail-4 FREE
+          $E2E lock '${{ needs.e16.outputs.lock-id }}' FAILED/RELEASED,GONE
+      - name: E17 lease still STALE
+        if: always()
+        run: $E2E lock '${{ needs.e17.outputs.lock-id }}' STALE
+      - name: An administrator releases the STALE leases
+        if: always()
+        run: |
+          $E2E admin release-stale
+          for r in e2e-fail-1 e2e-fail-2 e2e-fail-3 e2e-fail-5; do $E2E resource $r FREE; done
+
+  judge:
+    needs:
+      [
+        preflight,
+        basic,
+        semantics,
+        e06,
+        e06p-holder,
+        e06p-low,
+        e06p-high,
+        e07,
+        e08,
+        e09,
+        e11,
+        e15,
+        e16,
+        e17,
+        e18,
+        e12,
+        verify-failures
+      ]
+    if: always() && needs.preflight.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: Judge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          E2E_SINCE: ${{ needs.preflight.outputs.since }}
+          E2E_VERSION: ${{ needs.preflight.outputs.version }}
+          E06P_HIGH: ${{ needs.e06p-high.outputs.lock-id }}
+          E06P_LOW: ${{ needs.e06p-low.outputs.lock-id }}
+        run: node e2e/tools/judge.mjs
+
+  cleanup:
+    needs: judge
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Reset the server
+        run: $E2E admin reset

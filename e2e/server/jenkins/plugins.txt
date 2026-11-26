@@ -1,0 +1,9 @@
+# lockable-resources itself comes from the build argument LR_VERSION.
+# Pipeline, the smallest set that runs lock() and sleep (E07's Jenkins side)
+workflow-job
+workflow-cps
+workflow-basic-steps
+# Per-user permissions: the action's user gets RemoteUse and nothing more
+matrix-auth
+# System Groovy for the e2e-admin job
+groovy

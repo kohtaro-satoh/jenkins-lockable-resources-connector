@@ -47,7 +47,7 @@ inputs:
   variable:
     description: >-
       Name of the environment variable that later steps get with the locked
-      resource names (also <variable>0, <variable>0_PROP_<name>, ...). Must
+      resource names (also <variable>0, <variable>0_<property>, <variable>_<property>, ...). Must
       not start with GITHUB_ or RUNNER_.
     required: false
   inverse-precedence:

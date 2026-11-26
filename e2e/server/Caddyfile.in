@@ -1,0 +1,6 @@
+# /etc/caddy/Caddyfile for the E2E server; 04-jenkins.sh fills in @DOMAIN@.
+# Caddy gets the certificate from Let's Encrypt and redirects http to https.
+@DOMAIN@ {
+	redir / /jenkins/ 302
+	reverse_proxy 127.0.0.1:8080
+}
