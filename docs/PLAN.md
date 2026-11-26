@@ -2,7 +2,8 @@
 
 - 作成: 2026-11-24
 - 状態: 実装中。2026-11-25 に M1・M2 を実装し、main にマージした（PR #1。単体テストと偽サーバの結合テストが通る）。
-  2026-11-26 に M0 の PoC を GitHub ホストランナーで走らせ、設計の前提がすべて成り立つことを確かめた（§12）。次は M3（E2E）
+  2026-11-26 に M0 の PoC を GitHub ホストランナーで走らせ、設計の前提がすべて成り立つことを確かめた（§12）。
+  同日、M3 の E2E（E01〜E18）がプラグイン 1560 と最新（1611）の両方で通った（§10.3）。次は M4（ドキュメントとリリース）
 - 基準: `jenkinsci/lockable-resources-plugin` upstream master
   [`82532cd`](https://github.com/jenkinsci/lockable-resources-plugin/tree/82532cdd3585ebefb06241c04aaf6201b4acb5b3)（2026-11-23）
 
@@ -357,7 +358,9 @@ main は lockId ごとの状態ファイル `$RUNNER_TEMP/lockable-resources/<lo
 - `lockEnvVars` の各項目（`PLC`、`PLC0`、`PLC0_X`、`PLC_X` …。X はプロパティ名。`PLC_X` は 1 つ目のリソースのプロパティ）を `GITHUB_ENV` に書き、後続ステップの
   環境変数にする。サーバは `variable` を指定したときだけ名前を載せる。
 - `variable` が `GITHUB_` / `RUNNER_` で始まる場合はエラーにする。GitHub はこれらの変数の上書きを受け付けない。
-- プロパティの値はログに出さない（秘密を入れる運用がありうる）。
+- プロパティの値はアクションのログに出さない。ただしランナーが、`GITHUB_ENV` で設定された変数を後続の各ステップのログの見出しに値ごと一覧表示する（E2E の E02 で確かめた。マスクはされない）。秘密をプロパティに入れないよう README に書く。
+  値をマスクする入力は付けない（2026-11-26 決定）。マスクすると同じ文字列がログのどこに出ても `***` になり、
+  IP アドレスや短い値ではログが読めなくなる。要望が出たら追加を考える
 
 ### 5.4 release サブアクションの入力
 
@@ -586,7 +589,7 @@ https・リバースプロキシ・コンテキストパスといった実運用
 | ID | 内容 | 確認すること | ランナー | 段階 |
 |---|---|---|---|---|
 | E01 | resource を指定して取得 → 後続ステップ → release | サーバで FREE に戻る。post は何もしない | ubuntu / windows / macos | 並列 |
-| E02 | label + quantity + variable、プロパティ付きのリソース | `X`、`X0`…、`X0_<プロパティ名>`、`X_<プロパティ名>` が後続ステップで読め、`env-vars` 出力と一致する。プロパティの値がロックのステップのログに出ない（judge がログを取って調べる） | ubuntu / windows / macos | 並列 |
+| E02 | label + quantity + variable、プロパティ付きのリソース | `X`、`X0`…、`X0_<プロパティ名>`、`X_<プロパティ名>` が後続ステップで読め、`env-vars` 出力と一致する。プロパティの値がロックのステップのログに出ない（judge がログを取って調べる。後続ステップの見出しにランナーが出す分は対象外で、件数だけ記録する） | ubuntu / windows / macos | 並列 |
 | E03 | extra（最新版では group も） | 全部まとめて取れる | ubuntu | 並列 |
 | E04 | skip-if-locked（前のステップが保持中のリソース） | SKIPPED、`acquired=false`、`if:` で後続が飛ぶ | ubuntu | 並列 |
 | E05 | allocate の期限（保持中のリソースを 20 秒の期限で要求） | `LOCK_WAIT_TIMEOUT` で失敗し、20 秒前後で終わる | ubuntu | 並列 |
@@ -612,6 +615,21 @@ https・リバースプロキシ・コンテキストパスといった実運用
 - 1 run の目安は 10〜15 分。プラグインの版を切り替えてもう 1 run 回す
 - 並列のジョブは十数本になるが、サーバへの負荷は 3 秒ごとのポーリングと 10 秒ごとの heartbeat なので、
   1 GB の VPS でも問題にならない
+
+#### 結果（2026-11-26）
+
+| プラグイン | run | 判定 |
+|---|---|---|
+| 1611.vd91dca_329d61（最新） | [45732853249](https://github.com/kohtaro-satoh/lockable-resources-remote-client-actions/actions/runs/45732853249) | 77 / 77 |
+| 1560.va_b_cd589f23eb_ | [45733313311](https://github.com/kohtaro-satoh/lockable-resources-remote-client-actions/actions/runs/45733313311) | 77 / 77 |
+
+- 1 run は約 3 分（並列のジョブが 2〜3 分、その後 E12・後確認・判定）
+- 監査ログで、どちらの版でも二重に保持された資源は無かった（31 資源、76 イベント）。priority の順、
+  Jenkins と Actions の順も期待どおり
+- 最初の run（[45732222354](https://github.com/kohtaro-satoh/lockable-resources-remote-client-actions/actions/runs/45732222354)）で、E02 の判定が runner の表示を拾って外れた。後続ステップの
+  見出しに `GITHUB_ENV` の値が出るのは runner の挙動で、アクションは出していない（§5.3。README を直した）
+- 想定どおりに失敗するステップの結論は、API ではどれも `failure`（ステップの `timeout-minutes` 切れも含む）。
+  job レベルの `continue-on-error` を付けたジョブも、ジョブの結論は `failure` になり、run 全体は緑のまま
 
 #### やらないこと
 
@@ -640,7 +658,7 @@ https・リバースプロキシ・コンテキストパスといった実運用
 | M0 | PoC: 設計の前提を確かめる | 下の 6 点を ubuntu / windows / macos で確かめた結果が本書に反映されている |
 | M1 | 中核（`client` / `request` / `session` / `inputs`） | 単体テストが通る。入力の対応表のケースがすべて通る |
 | M2 | main / post / デーモン / release サブアクション | 偽サーバでの結合テストが通る |
-| M3 | E2E ワークフロー | E01〜E18 がすべて通る（プラグイン 1560 と最新の 2 版。§10.3 の VPS 上の Jenkins） |
+| M3 | E2E ワークフロー | E01〜E18 がすべて通る（プラグイン 1560 と最新の 2 版。§10.3 の VPS 上の Jenkins）。**2026-11-26 達成** |
 | M4 | ドキュメントとリリース | README（英語）、使用例、`v1.0.0` タグと `v1` の移動タグ、Marketplace に出すかの判断 |
 
 M0 で確かめること:

@@ -149,7 +149,11 @@ expires on its own.
 
 With `variable: PLC`, later steps get `PLC`, `PLC0`, `PLC0_<property>` and
 `PLC_<property>` (the first resource's properties), ... as environment
-variables, as in a Jenkins `lock()` block. Property values are never printed.
+variables, as in a Jenkins `lock()` block.
+
+The action never prints property values, but the runner lists every variable
+set through `GITHUB_ENV` in the log header of each later step, values
+included. They are not masked, so keep secrets out of resource properties.
 
 ## Limits
 
