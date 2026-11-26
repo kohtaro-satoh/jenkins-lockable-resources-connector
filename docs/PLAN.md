@@ -357,7 +357,7 @@ main は lockId ごとの状態ファイル `$RUNNER_TEMP/lockable-resources/<lo
 - `lockEnvVars` の各項目（`PLC`、`PLC0`、`PLC0_X`、`PLC_X` …。X はプロパティ名。`PLC_X` は 1 つ目のリソースのプロパティ）を `GITHUB_ENV` に書き、後続ステップの
   環境変数にする。サーバは `variable` を指定したときだけ名前を載せる。
 - `variable` が `GITHUB_` / `RUNNER_` で始まる場合はエラーにする。GitHub はこれらの変数の上書きを受け付けない。
-- プロパティの値はログに出さない（秘密を入れる運用がありうる）。
+- プロパティの値はアクションのログに出さない。ただしランナーが、`GITHUB_ENV` で設定された変数を後続の各ステップのログの見出しに値ごと一覧表示する（E2E の E02 で確かめた。マスクはされない）。秘密をプロパティに入れないよう README に書く
 
 ### 5.4 release サブアクションの入力
 
@@ -586,7 +586,7 @@ https・リバースプロキシ・コンテキストパスといった実運用
 | ID | 内容 | 確認すること | ランナー | 段階 |
 |---|---|---|---|---|
 | E01 | resource を指定して取得 → 後続ステップ → release | サーバで FREE に戻る。post は何もしない | ubuntu / windows / macos | 並列 |
-| E02 | label + quantity + variable、プロパティ付きのリソース | `X`、`X0`…、`X0_<プロパティ名>`、`X_<プロパティ名>` が後続ステップで読め、`env-vars` 出力と一致する。プロパティの値がロックのステップのログに出ない（judge がログを取って調べる） | ubuntu / windows / macos | 並列 |
+| E02 | label + quantity + variable、プロパティ付きのリソース | `X`、`X0`…、`X0_<プロパティ名>`、`X_<プロパティ名>` が後続ステップで読め、`env-vars` 出力と一致する。プロパティの値がロックのステップのログに出ない（judge がログを取って調べる。後続ステップの見出しにランナーが出す分は対象外で、件数だけ記録する） | ubuntu / windows / macos | 並列 |
 | E03 | extra（最新版では group も） | 全部まとめて取れる | ubuntu | 並列 |
 | E04 | skip-if-locked（前のステップが保持中のリソース） | SKIPPED、`acquired=false`、`if:` で後続が飛ぶ | ubuntu | 並列 |
 | E05 | allocate の期限（保持中のリソースを 20 秒の期限で要求） | `LOCK_WAIT_TIMEOUT` で失敗し、20 秒前後で終わる | ubuntu | 並列 |

@@ -187,15 +187,27 @@ async function gh(url) {
   return url.endsWith('/logs') ? await res.text() : await res.json()
 }
 
-/** The text between the "E2E-MARK <from>" and "E2E-MARK <to>" lines of a job log. */
+/**
+ * The steps between the "E2E-MARK <from>" output line and the step that prints
+ * "E2E-MARK <to>". It ends where that step begins (its "##[group]Run" header):
+ * the runner lists the GITHUB_ENV variables in every step's header, and those
+ * lines are the runner's, not the action's.
+ */
 function section(log, from, to) {
   const lines = log.split(/\r?\n/)
   const isMark = (line, name) =>
     new RegExp(`E2E-MARK ${name}$`).test(line) && !line.includes('echo')
   const start = lines.findIndex((l) => isMark(l, from))
   if (start < 0) return undefined
-  const end = lines.findIndex((l, i) => i > start && isMark(l, to))
-  return lines.slice(start, end < 0 ? undefined : end).join('\n')
+  let end = lines.findIndex((l, i) => i > start && isMark(l, to))
+  if (end < 0) return lines.slice(start).join('\n')
+  for (let i = end; i > start; i--) {
+    if (lines[i].includes('##[group]Run ')) {
+      end = i
+      break
+    }
+  }
+  return lines.slice(start, end).join('\n')
 }
 
 async function checkJobs() {
