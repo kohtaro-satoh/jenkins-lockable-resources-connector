@@ -270,7 +270,7 @@ sequenceDiagram
     S-->>M: ACQUIRED + resources + lockEnvVars
     M->>D: start (detached), wait for the first heartbeat
     M->>M: GITHUB_ENV, outputs
-    Note over M: lock step ends; later steps hold the lock
+    Note over M: lock step ends, later steps hold the lock
     loop every 10 s
         D->>S: POST /lease/{lockId}/heartbeat
     end
@@ -278,11 +278,11 @@ sequenceDiagram
         R->>S: GET /acquire/{lockId}/ (not STALE?)
         R->>S: POST /lease/{lockId}/release
         R->>D: stop file, wait for stoppedAt
-        P->>P: already released; job summary
+        P->>P: already released, job summary
     else a step fails or the job is cancelled (no release step)
         P->>D: stop file (no release)
         P->>P: fail the step: lock not released
-        Note over S: STALE about 60 s after the last heartbeat; an administrator checks and releases
+        Note over S: STALE about 60 s after the last heartbeat, then an administrator checks and releases
     end
 ```
 
