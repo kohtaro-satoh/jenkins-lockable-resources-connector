@@ -1,12 +1,12 @@
 /**
- * The release sub-action (release/action.yml, PLAN §5.4). The only place that
+ * The release sub-action (release/action.yml, docs/design.md §5.4). The only place that
  * frees a held lock.
  *
  * Order: check the lease, send release (retrying transient failures while the
  * daemon keeps heartbeating), and only then stop the daemon, so a short
  * network outage during the release cannot let the lease go STALE.
  *
- * A STALE lease is not released (PLAN §14-6): the server would allow it, but
+ * A STALE lease is not released (docs/design.md §4.1): the server would allow it, but
  * STALE means heartbeats were missing while the job ran, so an administrator
  * should look at the resources first, just as for a failed job.
  */
@@ -181,7 +181,7 @@ function staleMessage(lockId: string, state: LockState | undefined): string {
   )
 }
 
-/** Heartbeat totals, plus a warning for anything that went wrong (PLAN §5.5). */
+/** Heartbeat totals, plus a warning for anything that went wrong (docs/design.md §5.5). */
 export function reportHeartbeats(
   io: Pick<Io, 'info' | 'warning'>,
   lockId: string,

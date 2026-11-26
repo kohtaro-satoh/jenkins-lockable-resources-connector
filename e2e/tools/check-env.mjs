@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// E02 (docs/PLAN.md §10.3): the lock step's environment variables reached this
+// E02 (docs/testing.md §4): the lock step's environment variables reached this
 // later step, match its env-vars output, and follow the Jenkins lock() naming:
 // POOL, POOL0/POOL1, POOL0_<property>, POOL_<property> (first resource).
 // Prints names only, never values.

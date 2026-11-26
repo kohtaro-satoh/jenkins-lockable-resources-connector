@@ -29438,7 +29438,7 @@ const coreIo = {
 
 /**
  * State shared between main, the heartbeat daemon, the release sub-action and
- * post (PLAN §4.5). core.saveState only reaches the same action's post, and the
+ * post (docs/design.md §4.5). core.saveState only reaches the same action's post, and the
  * release sub-action is a different action, so main writes one file per lock
  * under $RUNNER_TEMP/lockable-resources/. The token is never written anywhere.
  */
@@ -29529,7 +29529,7 @@ function sleepSync(ms) {
 }
 
 /**
- * Starting and stopping the heartbeat daemon (PLAN §4.3).
+ * Starting and stopping the heartbeat daemon (docs/design.md §4.3).
  *
  * The daemon is a detached Node process so it outlives the main step. It
  * inherits the environment (including RUNNER_TRACKING_ID, which is how the
@@ -32511,7 +32511,7 @@ function describeRequest(r) {
  * Reads the action inputs and checks types and formats only. Whether the
  * combination makes sense (resource and label together, priority with
  * inversePrecedence, no target at all) is left to the server, which answers
- * with the same wording as a local lock() (PLAN §5.2).
+ * with the same wording as a local lock() (docs/design.md §5.2).
  */
 class InputError extends Error {
     constructor(message) {
@@ -32588,7 +32588,7 @@ function readLockInputs(get, env) {
     const clientId = optionalString(get('client-id')) ?? defaultClientId(env);
     return { connection, warnings, clientId, request };
 }
-/** `<workflow> #<run_number> (<job>) <run URL>` (PLAN §5.2). */
+/** `<workflow> #<run_number> (<job>) <run URL>` (docs/design.md §5.2). */
 function defaultReason(env) {
     let reason = env.GITHUB_WORKFLOW || 'GitHub Actions';
     if (env.GITHUB_RUN_NUMBER)

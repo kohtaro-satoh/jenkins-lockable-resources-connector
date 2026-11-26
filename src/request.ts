@@ -4,7 +4,7 @@
  *
  * Deliberate differences, each pinned by its own test:
  * - priority is sent when it is not 0. Jenkins sends it only when it is
- *   positive, so a negative priority is lost on the remote path (PLAN §11-1).
+ *   positive, so a negative priority is lost on the remote path (docs/design.md §10).
  * - reason is always sent; when the input is empty it is filled in from the
  *   workflow run so an administrator can tell who holds the lock.
  * - resourceSelectStrategy is sent upper-cased (the server upper-cases it too).

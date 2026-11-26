@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Helper for .github/workflows/e2e.yml (docs/PLAN.md §10.3): talks to the E2E
+// Helper for .github/workflows/e2e.yml (docs/testing.md §4): talks to the E2E
 // Jenkins as e2e-robot (remote API, read-only use here) and as e2e-ops (the
 // e2e-admin and e2e-holder jobs). Plain Node, no dependencies.
 //

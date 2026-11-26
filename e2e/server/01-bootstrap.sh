@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Step 1 on a fresh ConoHa Ubuntu 26.04 VPS (docs/PLAN.md §10.3), as root:
+# Step 1 on a fresh ConoHa Ubuntu 26.04 VPS (docs/testing.md §4), as root:
 #
 #   scp -r e2e/server root@<host>:lrrc-e2e && ssh root@<host> bash lrrc-e2e/01-bootstrap.sh
 #

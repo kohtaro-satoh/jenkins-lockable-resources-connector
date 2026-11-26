@@ -1,4 +1,4 @@
-# The E2E Jenkins (docs/PLAN.md §10.3). One at a time: switch.sh sets LR in
+# The E2E Jenkins (docs/testing.md §4). One at a time: switch.sh sets LR in
 # .env to the plugin version to run, and each version keeps its own
 # JENKINS_HOME. Published on 127.0.0.1 only; Caddy is the way in.
 name: lrrc-e2e

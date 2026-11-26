@@ -142,7 +142,7 @@ describe('buildLockRequestJson: inputs -> lockRequest', () => {
       { label: 'plc', 'resource-select-strategy': '' },
       { group: 'common', label: 'plc' }
     ],
-    // --- priority (differs from Jenkins for negative values, PLAN §11-1)
+    // --- priority (differs from Jenkins for negative values, docs/design.md §10)
     [
       'priority empty',
       { resource: 'r1', priority: '' },
@@ -320,7 +320,37 @@ describe('buildLockRequestJson: inputs -> lockRequest', () => {
 // ---------------------------------------------------------------------------
 // Reference model: LockStep setters -> RemoteLockRequest.from ->
 // RemoteApiClient.buildLockRequestJson, transliterated from
-// lockable-resources-plugin 82532cd. Compared over a grid of tricky values.
+// lockable-resources-plugin 82532cd
+// (https://github.com/jenkinsci/lockable-resources-plugin/tree/82532cdd3585ebefb06241c04aaf6201b4acb5b3).
+// Compared over a grid of tricky values.
+//
+// This reference model is derived from the plugin's code and keeps the
+// plugin's notice (LICENSE.txt at that commit):
+//
+//   The MIT License
+//
+//   Copyright 2013-2015, 6WIND S.A.
+//   Copyright 2016-2018, Antonio Muñiz
+//   Copyright 2019-2021, TobiX
+//   Copyright 2022-2026, Martin Pokorny and contributors
+//
+//   Permission is hereby granted, free of charge, to any person obtaining a copy
+//   of this software and associated documentation files (the "Software"), to deal
+//   in the Software without restriction, including without limitation the rights
+//   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//   copies of the Software, and to permit persons to whom the Software is
+//   furnished to do so, subject to the following conditions:
+//
+//   The above copyright notice and this permission notice shall be included in
+//   all copies or substantial portions of the Software.
+//
+//   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+//   THE SOFTWARE.
 
 interface JenkinsStep {
   resource?: string

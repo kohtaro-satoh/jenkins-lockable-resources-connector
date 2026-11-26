@@ -1,5 +1,5 @@
 /**
- * The heartbeat daemon's loop (PLAN §4.3, §6).
+ * The heartbeat daemon's loop (docs/design.md §4.3, §6).
  *
  * - The first heartbeat goes out at once, then one every 10 s (fixed delay,
  *   like the Jenkins client).

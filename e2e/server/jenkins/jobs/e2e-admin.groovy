@@ -1,4 +1,4 @@
-// The administrator operations the E2E tests need (docs/PLAN.md §10.3),
+// The administrator operations the E2E tests need (docs/testing.md §4),
 // started by CI as e2e-ops with OP and ARG. Results are lines starting with
 // "E2E|" in the console output. Only the operations below exist, and ARG is
 // checked before use: e2e-ops must not get more than this.

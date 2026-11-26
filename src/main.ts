@@ -2,7 +2,7 @@
  * The lock step (action.yml runs.main): validate the inputs, acquire, and
  * hand the lock over to the workflow. "Held" starts only once the hand-over is
  * complete: heartbeat daemon running, environment variables and outputs set
- * (PLAN §4.1). If anything fails or the step is cancelled before that, the
+ * (docs/design.md §4.1). If anything fails or the step is cancelled before that, the
  * request is withdrawn, because no step has touched the resources yet.
  */
 import type { Connection, LockApi } from './client.js'

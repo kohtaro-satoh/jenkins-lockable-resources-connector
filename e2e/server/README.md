@@ -1,8 +1,10 @@
 # E2E server
 
+English | [日本語](README.ja.md)
+
 The Jenkins that `.github/workflows/e2e.yml` tests against (design:
-[docs/PLAN.md §10.3](../../docs/PLAN.md)). A throwaway VPS (Ubuntu 26.04,
-1 GB of memory) that runs only while tests run.
+[docs/testing.md §4](../../docs/testing.md#4-end-to-end-tests)). A throwaway
+VPS (Ubuntu 26.04, 1 GB of memory) that runs only while tests run.
 
 ## Build it
 
@@ -48,3 +50,7 @@ Only one Jenkins fits in memory, so each plugin version is a separate run.
   would be open to anyone.
 - `e2e-admin` is the only way CI gets administrator operations; see
   `jenkins/jobs/e2e-admin.groovy`.
+- To watch a run on the Jenkins pages, log in as `admin`; the password is
+  `E2E_ADMIN_PASSWORD` in `secrets.env` (read it over SSH). Do not lock,
+  reserve or reset `e2e-` resources by hand during a run. Each version has its
+  own JENKINS_HOME, so log in again after a switch.

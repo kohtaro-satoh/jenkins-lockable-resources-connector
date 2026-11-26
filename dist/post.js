@@ -29438,7 +29438,7 @@ const coreIo = {
 
 /**
  * State shared between main, the heartbeat daemon, the release sub-action and
- * post (PLAN §4.5). core.saveState only reaches the same action's post, and the
+ * post (docs/design.md §4.5). core.saveState only reaches the same action's post, and the
  * release sub-action is a different action, so main writes one file per lock
  * under $RUNNER_TEMP/lockable-resources/. The token is never written anywhere.
  */
@@ -29548,7 +29548,7 @@ function sleepSync(ms) {
 }
 
 /**
- * Starting and stopping the heartbeat daemon (PLAN §4.3).
+ * Starting and stopping the heartbeat daemon (docs/design.md §4.3).
  *
  * The daemon is a detached Node process so it outlives the main step. It
  * inherits the environment (including RUNNER_TRACKING_ID, which is how the
@@ -30911,7 +30911,7 @@ function fallbackToDoubleQuoted(layout) {
  * Reads the action inputs and checks types and formats only. Whether the
  * combination makes sense (resource and label together, priority with
  * inversePrecedence, no target at all) is left to the server, which answers
- * with the same wording as a local lock() (PLAN §5.2).
+ * with the same wording as a local lock() (docs/design.md §5.2).
  */
 class InputError extends Error {
     constructor(message) {
@@ -30980,18 +30980,18 @@ async function withRetry(fn, o) {
 }
 
 /**
- * The release sub-action (release/action.yml, PLAN §5.4). The only place that
+ * The release sub-action (release/action.yml, docs/design.md §5.4). The only place that
  * frees a held lock.
  *
  * Order: check the lease, send release (retrying transient failures while the
  * daemon keeps heartbeating), and only then stop the daemon, so a short
  * network outage during the release cannot let the lease go STALE.
  *
- * A STALE lease is not released (PLAN §14-6): the server would allow it, but
+ * A STALE lease is not released (docs/design.md §4.1): the server would allow it, but
  * STALE means heartbeats were missing while the job ran, so an administrator
  * should look at the resources first, just as for a failed job.
  */
-/** Heartbeat totals, plus a warning for anything that went wrong (PLAN §5.5). */
+/** Heartbeat totals, plus a warning for anything that went wrong (docs/design.md §5.5). */
 function reportHeartbeats(io, lockId, status, 
 /** A LOCK_NOT_FOUND answer at or after this time is expected (lock released). */
 releasedFrom) {

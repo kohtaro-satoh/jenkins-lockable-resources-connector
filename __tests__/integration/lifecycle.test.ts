@@ -1,6 +1,6 @@
 /**
  * main -> heartbeat daemon -> release -> post as real processes, against the
- * fake server (PLAN §10.2). Runs the bundles in dist/, so `npm run package`
+ * fake server (docs/testing.md §2). Runs the bundles in dist/, so `npm run package`
  * first. The client's intervals are scaled by 0.1 (poll 300 ms, heartbeat 1 s).
  */
 import {
@@ -218,7 +218,7 @@ describe('before the hand-over', () => {
   })
 })
 
-describe('a STALE lease (PLAN §14-6)', () => {
+describe('a STALE lease (docs/design.md §4.1)', () => {
   it('the release step refuses to release it and fails', async () => {
     const main = await runner.run('main', lockInputs())
     expect(main.code).toBe(0)

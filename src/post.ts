@@ -1,7 +1,7 @@
 /**
  * The lock step's post (action.yml runs.post, post-if: always()).
  *
- * It never releases a held lock (PLAN §4.1). Per stage:
+ * It never releases a held lock (docs/design.md §4.1). Per stage:
  * - enqueued: the request was never handed over -> withdraw it
  * - held:     the release step did not run -> stop the daemon, do NOT
  *             release, fail the step; the server marks the lease STALE

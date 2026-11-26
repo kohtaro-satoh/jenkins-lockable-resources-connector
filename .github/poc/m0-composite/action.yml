@@ -1,6 +1,6 @@
 name: M0 composite wrapper
 description: >-
-  Item 6 (docs/PLAN.md §2, §12): an organization's thin composite wrapper
+  Item 6 (docs/design.md §2, docs/testing.md §3): an organization's thin composite wrapper
   around a JavaScript action. Does the inner action's post still run?
 runs:
   using: composite
