@@ -33,7 +33,7 @@ const DAEMON = {
 }
 
 beforeEach(() => {
-  temp = fs.mkdtempSync(path.join(os.tmpdir(), 'lrrc-post-'))
+  temp = fs.mkdtempSync(path.join(os.tmpdir(), 'jlrc-post-'))
 })
 afterEach(() => {
   fs.rmSync(temp, { recursive: true, force: true })

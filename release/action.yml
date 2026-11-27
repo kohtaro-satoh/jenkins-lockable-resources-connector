@@ -1,6 +1,6 @@
-name: Jenkins Remote Lockable Resources - release
+name: Jenkins Lockable Resources Connector - release
 description: >-
-  Release a lock taken by kohtaro-satoh/lockable-resources-remote-client-actions.
+  Release a lock taken by kohtaro-satoh/jenkins-lockable-resources-connector.
   Required: without this step the lease is not released and becomes STALE.
 author: kohtaro-satoh
 branding:

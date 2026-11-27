@@ -23,7 +23,7 @@ const INPUTS = {
 }
 
 beforeEach(() => {
-  temp = fs.mkdtempSync(path.join(os.tmpdir(), 'lrrc-main-'))
+  temp = fs.mkdtempSync(path.join(os.tmpdir(), 'jlrc-main-'))
 })
 afterEach(() => {
   fs.rmSync(temp, { recursive: true, force: true })

@@ -183,7 +183,7 @@ jobs:
       LOCKABLE_RESOURCES_SERVER_URL: ${{ vars.LOCKABLE_RESOURCES_SERVER_URL }}
       LOCKABLE_RESOURCES_USERNAME: ${{ vars.LOCKABLE_RESOURCES_USERNAME }}
     steps:
-      - uses: kohtaro-satoh/lockable-resources-remote-client-actions@<commit-sha>
+      - uses: kohtaro-satoh/jenkins-lockable-resources-connector@<commit-sha>
         id: lock
         with:
           token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
@@ -195,7 +195,7 @@ jobs:
       - run: ./flash.sh "$PLC0" # holds the lock
 
       # Required. Without an if:, it does not run after a failure: STALE.
-      - uses: kohtaro-satoh/lockable-resources-remote-client-actions/release@<commit-sha>
+      - uses: kohtaro-satoh/jenkins-lockable-resources-connector/release@<commit-sha>
         with:
           token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
           lock-id: ${{ steps.lock.outputs.lock-id }}

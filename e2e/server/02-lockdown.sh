@@ -11,7 +11,7 @@ set -euo pipefail
 # sshd takes the first value it reads, and sshd_config includes this
 # directory before its own "PermitRootLogin yes", so a 00- file wins.
 sudo tee /etc/ssh/sshd_config.d/00-lrrc-e2e.conf >/dev/null <<'EOF'
-# lockable-resources-remote-client-actions E2E server: key login as ops only.
+# jenkins-lockable-resources-connector E2E server: key login as ops only.
 PermitRootLogin no
 PasswordAuthentication no
 KbdInteractiveAuthentication no

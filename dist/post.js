@@ -29562,14 +29562,14 @@ function sleepSync(ms) {
  * belongs to the daemon (PIDs are reused).
  */
 const DAEMON_ENV = {
-    serverUrl: 'LRRC_DAEMON_SERVER_URL',
-    username: 'LRRC_DAEMON_USERNAME',
-    token: 'LRRC_DAEMON_TOKEN',
-    lockId: 'LRRC_DAEMON_LOCK_ID',
-    stateFile: 'LRRC_DAEMON_STATE_FILE',
-    statusFile: 'LRRC_DAEMON_STATUS_FILE',
-    logFile: 'LRRC_DAEMON_LOG_FILE',
-    stopFile: 'LRRC_DAEMON_STOP_FILE'
+    serverUrl: 'JLRC_DAEMON_SERVER_URL',
+    username: 'JLRC_DAEMON_USERNAME',
+    token: 'JLRC_DAEMON_TOKEN',
+    lockId: 'JLRC_DAEMON_LOCK_ID',
+    stateFile: 'JLRC_DAEMON_STATE_FILE',
+    statusFile: 'JLRC_DAEMON_STATUS_FILE',
+    logFile: 'JLRC_DAEMON_LOG_FILE',
+    stopFile: 'JLRC_DAEMON_STOP_FILE'
 };
 function daemonEnvironment(base, o, files) {
     const env = {};

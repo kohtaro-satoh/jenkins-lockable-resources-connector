@@ -1,4 +1,4 @@
-# lockable-resources-remote-client-actions
+# jenkins-lockable-resources-connector
 
 English | [日本語](README.ja.md)
 
@@ -6,8 +6,8 @@ A GitHub Action that locks resources defined on a Jenkins controller
 (the [lockable-resources plugin](https://plugins.jenkins.io/lockable-resources/))
 from a GitHub Actions job. The request joins the **same queue** as Jenkins
 `lock()` steps, with the same ordering rules (priority, inversePrecedence) and
-the same mutual exclusion, so pipelines and workflows can share hardware,
-test environments or licenses safely.
+the same mutual exclusion, so GitHub Actions workflows and Jenkins pipelines
+can share hardware, test environments or licenses safely.
 
 > **Status: pre-release (0.x).** Tested end to end against lockable-resources
 > 1560 and 1611 from GitHub-hosted Linux, Windows and macOS runners
@@ -42,7 +42,7 @@ jobs:
       LOCKABLE_RESOURCES_SERVER_URL: ${{ vars.LOCKABLE_RESOURCES_SERVER_URL }}
       LOCKABLE_RESOURCES_USERNAME: ${{ vars.LOCKABLE_RESOURCES_USERNAME }}
     steps:
-      - uses: kohtaro-satoh/lockable-resources-remote-client-actions@<commit-sha>
+      - uses: kohtaro-satoh/jenkins-lockable-resources-connector@<commit-sha>
         id: lock
         with:
           token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
@@ -54,7 +54,7 @@ jobs:
       - run: ./flash.sh "$PLC0" # holds the lock
 
       # Required. Without it the lock is not released (see below).
-      - uses: kohtaro-satoh/lockable-resources-remote-client-actions/release@<commit-sha>
+      - uses: kohtaro-satoh/jenkins-lockable-resources-connector/release@<commit-sha>
         with:
           token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
           lock-id: ${{ steps.lock.outputs.lock-id }}
@@ -91,7 +91,7 @@ withdrawn, since no step has touched the resources yet.
 ### skip-if-locked
 
 ```yaml
-- uses: kohtaro-satoh/lockable-resources-remote-client-actions@<commit-sha>
+- uses: kohtaro-satoh/jenkins-lockable-resources-connector@<commit-sha>
   id: lock
   with:
     token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
@@ -99,7 +99,7 @@ withdrawn, since no step has touched the resources yet.
     skip-if-locked: true
 - if: steps.lock.outputs.acquired == 'true'
   run: ./print.sh
-- uses: kohtaro-satoh/lockable-resources-remote-client-actions/release@<commit-sha>
+- uses: kohtaro-satoh/jenkins-lockable-resources-connector/release@<commit-sha>
   with:
     token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
     lock-id: ${{ steps.lock.outputs.lock-id }}
@@ -114,24 +114,24 @@ Call the action once per lock, each with its own `id`, `variable` and release
 step:
 
 ```yaml
-- uses: kohtaro-satoh/lockable-resources-remote-client-actions@<commit-sha>
+- uses: kohtaro-satoh/jenkins-lockable-resources-connector@<commit-sha>
   id: board
   with:
     token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
     label: board
     quantity: 1
     variable: BOARD
-- uses: kohtaro-satoh/lockable-resources-remote-client-actions@<commit-sha>
+- uses: kohtaro-satoh/jenkins-lockable-resources-connector@<commit-sha>
   id: license
   with:
     token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
     resource: compiler-license
 - run: ./build-and-flash.sh "$BOARD0"
-- uses: kohtaro-satoh/lockable-resources-remote-client-actions/release@<commit-sha>
+- uses: kohtaro-satoh/jenkins-lockable-resources-connector/release@<commit-sha>
   with:
     token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
     lock-id: ${{ steps.license.outputs.lock-id }}
-- uses: kohtaro-satoh/lockable-resources-remote-client-actions/release@<commit-sha>
+- uses: kohtaro-satoh/jenkins-lockable-resources-connector/release@<commit-sha>
   with:
     token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
     lock-id: ${{ steps.board.outputs.lock-id }}
@@ -141,33 +141,43 @@ To take several resources atomically, as one request, use `extra` instead.
 
 ## Inputs
 
-| Input                           | `lock()`                     | Default                               |
-| ------------------------------- | ---------------------------- | ------------------------------------- |
-| `server-url`                    | —                            | `$LOCKABLE_RESOURCES_SERVER_URL`      |
-| `username`                      | —                            | `$LOCKABLE_RESOURCES_USERNAME`        |
-| `token`                         | —                            | required, never from the environment  |
-| `client-id`                     | —                            | `github-actions:<owner>/<repo>`       |
-| `resource`                      | `resource`                   |                                       |
-| `label`                         | `label`                      |                                       |
-| `group`                         | `group`                      |                                       |
-| `quantity`                      | `quantity`                   | `0` (all matching)                    |
-| `variable`                      | `variable`                   |                                       |
-| `inverse-precedence`            | `inversePrecedence`          | `false`                               |
-| `resource-select-strategy`      | `resourceSelectStrategy`     | `SEQUENTIAL`                          |
-| `skip-if-locked`                | `skipIfLocked`               | `false`                               |
-| `extra`                         | `extra`                      | YAML or JSON list                     |
-| `priority`                      | `priority`                   | `0`                                   |
-| `timeout-for-allocate-resource` | `timeoutForAllocateResource` | `0` (wait forever)                    |
-| `timeout-unit`                  | `timeoutUnit`                | `MINUTES`                             |
-| `reason`                        | `reason`                     | `<workflow> #<run> (<job>) <run URL>` |
+Defaults and choices are those of lockable-resources 1611.vd91dca_329d61.
+Choice values are not case sensitive (`random` works too).
+
+| Input                           | Default                               | Description                                                                                                                                                                                                                                                                                                |
+| ------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Connection**                  |                                       |                                                                                                                                                                                                                                                                                                            |
+| `server-url`                    | `$LOCKABLE_RESOURCES_SERVER_URL`      | Root URL of Jenkins, including the context path, for example `https://ci.example.com/jenkins`.                                                                                                                                                                                                             |
+| `username`                      | `$LOCKABLE_RESOURCES_USERNAME`        | Jenkins user with the **Overall/Read** and **Lockable Resources/RemoteUse** permissions.                                                                                                                                                                                                                   |
+| `token`                         | (required)                            | API token of that user, not its password. Pass it from a secret: it is never read from the environment.                                                                                                                                                                                                    |
+| **What to lock**                |                                       | Set `resource`, `label` or `group`, or list everything in `extra`.                                                                                                                                                                                                                                         |
+| `resource`                      |                                       | Name of the resource to lock, as listed on the Jenkins _Lockable Resources_ page. It must exist there and carry the expose label: unlike a `lock()` in a pipeline, a missing resource is not created. Cannot be combined with `label`.                                                                     |
+| `label`                         |                                       | Choose resources by label instead of by name. A label expression works too, such as `gpu && linux` or `board-a \|\| board-b`. Only resources that carry the expose label are considered. Set `quantity` to say how many. Cannot be combined with `resource`.                                               |
+| `quantity`                      | `0`                                   | How many of the resources matching `label` (or `group`) to lock. `0` locks **all** of them, so the step waits until every one is free. To take one free resource out of a pool, set `1`.                                                                                                                   |
+| `group`                         | `common`                              | Choose resources only from this resource group (lockable-resources 1588 or later). `resource` and `label` are matched within the group, with no fallback to other groups. With `group` alone (no `resource` or `label`), the whole group is the pool and `quantity` counts its members.                    |
+| `extra`                         |                                       | More resources to lock in the same request, all at once or none: a YAML (or JSON) list of entries, each with `resource` or `label`, and optionally `quantity` and `group` (an entry without `group` uses the main `group`). See the example below.                                                         |
+| `resource-select-strategy`      | `SEQUENTIAL`                          | Which free resources to take when more match than needed. `SEQUENTIAL`: in the order of the Jenkins resources list. `RANDOM`: in random order.                                                                                                                                                             |
+| **Waiting in the queue**        |                                       |                                                                                                                                                                                                                                                                                                            |
+| `priority`                      | `0`                                   | Order among requests waiting for the same resources: the highest number is served first, equal numbers in order of arrival. Negative numbers wait behind the default `0`. Cannot be combined with `inverse-precedence`.                                                                                    |
+| `inverse-precedence`            | `false`                               | `true`: jump the queue. Requests with `true` are served before the others, and among them the newest first. Cannot be combined with `priority`.                                                                                                                                                            |
+| `skip-if-locked`                | `false`                               | `true`: do not wait. If the resources cannot be locked at once, the step locks nothing and succeeds with the output `acquired` set to `false`. Check it in later steps: `if: steps.<id>.outputs.acquired == 'true'`.                                                                                       |
+| `timeout-for-allocate-resource` | `0`                                   | Stop waiting after this long, in `timeout-unit`; the step then fails with `LOCK_WAIT_TIMEOUT`. `0` waits without limit. Setting it is recommended: waiting counts towards the job's time limit and billing, and a request left behind by a runner that vanished then expires on its own.                   |
+| `timeout-unit`                  | `MINUTES`                             | Unit of `timeout-for-allocate-resource`: `SECONDS`, `MINUTES` or `HOURS`. The other Java `TimeUnit` names (`DAYS`, `MILLISECONDS`, ...) work too, but the plugin documents only these three.                                                                                                               |
+| **While the lock is held**      |                                       |                                                                                                                                                                                                                                                                                                            |
+| `variable`                      |                                       | Name of an environment variable for later steps. It gets the names of the locked resources, comma separated; `<variable>0`, `<variable>1`, ... get each name and its properties (see [Outputs and environment variables](#outputs-and-environment-variables)). Must not start with `GITHUB_` or `RUNNER_`. |
+| `reason`                        | `<workflow> #<run> (<job>) <run URL>` | Shown on the Jenkins _Lockable Resources_ page while the lock is held, so that others can see why the resource is busy.                                                                                                                                                                                    |
+| `client-id`                     | `github-actions:<owner>/<repo>`       | Shown next to the lock on the Jenkins page, to tell which client holds it.                                                                                                                                                                                                                                 |
 
 The release step (`/release`) takes `lock-id` and the same `server-url`,
 `username` and `token`.
 
 The action checks types and formats only. Whether a combination makes sense
-(`resource` with `label`, `priority` with `inverse-precedence`, no target at
-all) is decided by the server, which answers with the same message as a local
+(`resource` with `label`, `priority` with `inverse-precedence`, nothing to
+lock) is decided by the server, which answers with the same message as a local
 `lock()`.
+
+`extra` example: lock `resource4` and two resources labelled `gpu`, together
+with the main `resource` or `label`:
 
 ```yaml
 extra: |
@@ -175,10 +185,6 @@ extra: |
   - label: gpu
     quantity: 2
 ```
-
-Set `timeout-for-allocate-resource`: waiting counts towards the job's time
-limit and billing, and a request left behind by a runner that vanished then
-expires on its own.
 
 ## Outputs and environment variables
 
@@ -200,11 +206,15 @@ included. They are not masked, so keep secrets out of resource properties.
 
 ## Limits
 
-- A lock lives within one job. Lock in each job that needs it.
-- Taking the same resource twice in one job makes the second request wait for
-  the first (there is no `shareId`). Set a timeout.
-- `server-id` (peer mode) and `share-id` are not supported: all locks go to the
-  one server configured (delegated mode).
+- A lock is valid within one job (one entry under `jobs:`).
+  - The heartbeats stop automatically when the job ends. If the job has not
+    run the release step by then, the lease becomes STALE.
+  - Put all the steps that need to hold the locked resources without a break
+    into one job.
+- Some `lock()` parameters have no input here, because the remote API does not
+  take them: `serverId` (all locks go to the one configured server, as in
+  delegated mode), `shareId`, and, since 1611, `candidates`, `onReleaseDelay`
+  and `onCancelDelay`.
 
 ## Troubleshooting
 

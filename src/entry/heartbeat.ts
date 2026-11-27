@@ -1,6 +1,6 @@
 /**
  * The heartbeat daemon process, started detached by the lock step. All of its
- * configuration arrives in LRRC_DAEMON_* environment variables.
+ * configuration arrives in JLRC_DAEMON_* environment variables.
  */
 import fs from 'node:fs'
 import { RemoteApiClient } from '../client.js'
@@ -27,7 +27,7 @@ delete env[DAEMON_ENV.token]
 
 if (Object.values(config).some((v) => v === '')) {
   process.stderr.write(
-    'heartbeat daemon: missing LRRC_DAEMON_* configuration\n'
+    'heartbeat daemon: missing JLRC_DAEMON_* configuration\n'
   )
   process.exit(2)
 }

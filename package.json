@@ -1,15 +1,15 @@
 {
-  "name": "lockable-resources-remote-client-actions",
-  "description": "GitHub Actions client for Jenkins Remote Lockable Resources (delegated mode)",
+  "name": "jenkins-lockable-resources-connector",
+  "description": "GitHub Action client for the remote API of the Jenkins lockable-resources plugin (delegated mode)",
   "version": "0.1.0",
   "author": "kohtaro-satoh",
   "license": "MIT",
   "private": true,
   "type": "module",
-  "homepage": "https://github.com/kohtaro-satoh/lockable-resources-remote-client-actions",
+  "homepage": "https://github.com/kohtaro-satoh/jenkins-lockable-resources-connector",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kohtaro-satoh/lockable-resources-remote-client-actions.git"
+    "url": "git+https://github.com/kohtaro-satoh/jenkins-lockable-resources-connector.git"
   },
   "engines": {
     "node": ">=22"
