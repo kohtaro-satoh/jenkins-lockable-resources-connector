@@ -48,8 +48,8 @@ CI はこれを ubuntu、windows、macos で回す。
 
 設計は、GitHub が文書にしていないランナーの挙動を前提にしている。何より先に、小さな検証用 action
 （`.github/poc/m0-probe`）を `m0-poc.yml` と `m0-poc-cancel.yml` で手動で走らせ、GitHub ホストランナーの
-ubuntu、windows、macos で確かめた（[run 45711891191](https://github.com/kohtaro-satoh/lockable-resources-remote-client-actions/actions/runs/45711891191)、
-[run 45711909304](https://github.com/kohtaro-satoh/lockable-resources-remote-client-actions/actions/runs/45711909304)、2026-11-26）。
+ubuntu、windows、macos で確かめた（[run 45711891191](https://github.com/kohtaro-satoh/jenkins-lockable-resources-connector/actions/runs/45711891191)、
+[run 45711909304](https://github.com/kohtaro-satoh/jenkins-lockable-resources-connector/actions/runs/45711909304)、2026-11-26）。
 6 つの前提はすべて成り立った。
 
 | 前提                                                                          | 結果                                                                                                                                                         |
@@ -171,8 +171,8 @@ Windows と macOS のランナーからも、コンテキストパス付きの�
 
 | プラグイン                    | run                                                                                                           | 判定    |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------- | ------- |
-| 1611.vd91dca_329d61（最新）   | [45732853249](https://github.com/kohtaro-satoh/lockable-resources-remote-client-actions/actions/runs/45732853249) | 77 / 77 |
-| 1560.va_b_cd589f23eb_         | [45733313311](https://github.com/kohtaro-satoh/lockable-resources-remote-client-actions/actions/runs/45733313311) | 77 / 77 |
+| 1611.vd91dca_329d61（最新）   | [45732853249](https://github.com/kohtaro-satoh/jenkins-lockable-resources-connector/actions/runs/45732853249) | 77 / 77 |
+| 1560.va_b_cd589f23eb_         | [45733313311](https://github.com/kohtaro-satoh/jenkins-lockable-resources-connector/actions/runs/45733313311) | 77 / 77 |
 
 （2026-11-26）1 run は約 3 分。どちらの版でも、監査ログに二重に保持されたリソースは無く（31 リソース、76 イベント）、
 priority の順と Jenkins / Actions の順も期待どおりだった。

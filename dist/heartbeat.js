@@ -339,14 +339,14 @@ function sleepSync(ms) {
  * belongs to the daemon (PIDs are reused).
  */
 const DAEMON_ENV = {
-    serverUrl: 'LRRC_DAEMON_SERVER_URL',
-    username: 'LRRC_DAEMON_USERNAME',
-    token: 'LRRC_DAEMON_TOKEN',
-    lockId: 'LRRC_DAEMON_LOCK_ID',
-    stateFile: 'LRRC_DAEMON_STATE_FILE',
-    statusFile: 'LRRC_DAEMON_STATUS_FILE',
-    logFile: 'LRRC_DAEMON_LOG_FILE',
-    stopFile: 'LRRC_DAEMON_STOP_FILE'
+    serverUrl: 'JLRC_DAEMON_SERVER_URL',
+    username: 'JLRC_DAEMON_USERNAME',
+    token: 'JLRC_DAEMON_TOKEN',
+    lockId: 'JLRC_DAEMON_LOCK_ID',
+    stateFile: 'JLRC_DAEMON_STATE_FILE',
+    statusFile: 'JLRC_DAEMON_STATUS_FILE',
+    logFile: 'JLRC_DAEMON_LOG_FILE',
+    stopFile: 'JLRC_DAEMON_STOP_FILE'
 };
 
 /**
@@ -524,7 +524,7 @@ const systemClock = {
 
 /**
  * The heartbeat daemon process, started detached by the lock step. All of its
- * configuration arrives in LRRC_DAEMON_* environment variables.
+ * configuration arrives in JLRC_DAEMON_* environment variables.
  */
 const env = process.env;
 const read = (name) => env[name] ?? '';
@@ -540,7 +540,7 @@ const config = {
 };
 delete env[DAEMON_ENV.token];
 if (Object.values(config).some((v) => v === '')) {
-    process.stderr.write('heartbeat daemon: missing LRRC_DAEMON_* configuration\n');
+    process.stderr.write('heartbeat daemon: missing JLRC_DAEMON_* configuration\n');
     process.exit(2);
 }
 const controller = new AbortController();

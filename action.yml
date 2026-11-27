@@ -1,4 +1,4 @@
-name: Jenkins Remote Lockable Resources
+name: Jenkins Lockable Resources Connector
 description: >-
   Lock resources defined on a Jenkins controller (lockable-resources plugin)
   from a GitHub Actions job, in the same queue as Jenkins lock() steps. Pair it

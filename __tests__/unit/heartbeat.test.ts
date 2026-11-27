@@ -26,7 +26,7 @@ const state = (stage: LockState['stage']): LockState => ({
 })
 
 beforeEach(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lrrc-hb-'))
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jlrc-hb-'))
   cfg = {
     lockId: 'lock-1',
     stateFile: path.join(dir, 'lock-1.json'),
@@ -197,8 +197,8 @@ describe('daemon process helpers', () => {
     expect(env.INPUT_TOKEN).toBeUndefined()
     expect(env['INPUT_SERVER-URL']).toBeUndefined()
     expect(env.STATE_lock).toBeUndefined()
-    expect(env.LRRC_DAEMON_TOKEN).toBe('secret')
-    expect(env.LRRC_DAEMON_LOCK_ID).toBe('lock-1')
+    expect(env.JLRC_DAEMON_TOKEN).toBe('secret')
+    expect(env.JLRC_DAEMON_LOCK_ID).toBe('lock-1')
   })
 
   it('tells live processes from gone ones', () => {

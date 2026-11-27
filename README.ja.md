@@ -1,4 +1,4 @@
-# lockable-resources-remote-client-actions
+# jenkins-lockable-resources-connector
 
 [English](README.md) | 日本語
 
@@ -6,8 +6,8 @@
 
 Jenkins コントローラで定義されたリソース（[lockable-resources プラグイン](https://plugins.jenkins.io/lockable-resources/)）を、
 GitHub Actions のジョブからロックする Action です。要求は Jenkins の `lock()` と**同じキュー**に並び、
-同じ順序規則（priority、inversePrecedence）と同じ排他で扱われます。パイプラインとワークフローの間で、
-実機、検証環境、ライセンスなどを安全に共有できます。
+同じ順序規則（priority、inversePrecedence）と同じ排他で扱われます。GitHub Actions のワークフローと Jenkins の
+パイプラインの間で、実機、検証環境、ライセンスなどを安全に共有できます。
 
 > **状態: プレリリース（0.x）。** GitHub ホストランナー（Linux、Windows、macOS）から、
 > lockable-resources 1560 と 1611 を相手に E2E テストを通しています（[docs/testing.ja.md](docs/testing.ja.md)）。
@@ -37,7 +37,7 @@ jobs:
       LOCKABLE_RESOURCES_SERVER_URL: ${{ vars.LOCKABLE_RESOURCES_SERVER_URL }}
       LOCKABLE_RESOURCES_USERNAME: ${{ vars.LOCKABLE_RESOURCES_USERNAME }}
     steps:
-      - uses: kohtaro-satoh/lockable-resources-remote-client-actions@<commit-sha>
+      - uses: kohtaro-satoh/jenkins-lockable-resources-connector@<commit-sha>
         id: lock
         with:
           token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
@@ -49,7 +49,7 @@ jobs:
       - run: ./flash.sh "$PLC0" # ロック中
 
       # 必須。これが無いとロックは解放されません（下記）。
-      - uses: kohtaro-satoh/lockable-resources-remote-client-actions/release@<commit-sha>
+      - uses: kohtaro-satoh/jenkins-lockable-resources-connector/release@<commit-sha>
         with:
           token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
           lock-id: ${{ steps.lock.outputs.lock-id }}
@@ -81,7 +81,7 @@ release ステップは、すでに STALE になった lease（ジョブの実�
 ### skip-if-locked
 
 ```yaml
-- uses: kohtaro-satoh/lockable-resources-remote-client-actions@<commit-sha>
+- uses: kohtaro-satoh/jenkins-lockable-resources-connector@<commit-sha>
   id: lock
   with:
     token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
@@ -89,7 +89,7 @@ release ステップは、すでに STALE になった lease（ジョブの実�
     skip-if-locked: true
 - if: steps.lock.outputs.acquired == 'true'
   run: ./print.sh
-- uses: kohtaro-satoh/lockable-resources-remote-client-actions/release@<commit-sha>
+- uses: kohtaro-satoh/jenkins-lockable-resources-connector/release@<commit-sha>
   with:
     token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
     lock-id: ${{ steps.lock.outputs.lock-id }}
@@ -103,24 +103,24 @@ release ステップは、すでに STALE になった lease（ジョブの実�
 ロックごとに Action を呼び、`id`、`variable`、release ステップをそれぞれ分けます。
 
 ```yaml
-- uses: kohtaro-satoh/lockable-resources-remote-client-actions@<commit-sha>
+- uses: kohtaro-satoh/jenkins-lockable-resources-connector@<commit-sha>
   id: board
   with:
     token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
     label: board
     quantity: 1
     variable: BOARD
-- uses: kohtaro-satoh/lockable-resources-remote-client-actions@<commit-sha>
+- uses: kohtaro-satoh/jenkins-lockable-resources-connector@<commit-sha>
   id: license
   with:
     token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
     resource: compiler-license
 - run: ./build-and-flash.sh "$BOARD0"
-- uses: kohtaro-satoh/lockable-resources-remote-client-actions/release@<commit-sha>
+- uses: kohtaro-satoh/jenkins-lockable-resources-connector/release@<commit-sha>
   with:
     token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
     lock-id: ${{ steps.license.outputs.lock-id }}
-- uses: kohtaro-satoh/lockable-resources-remote-client-actions/release@<commit-sha>
+- uses: kohtaro-satoh/jenkins-lockable-resources-connector/release@<commit-sha>
   with:
     token: ${{ secrets.LOCKABLE_RESOURCES_TOKEN }}
     lock-id: ${{ steps.board.outputs.lock-id }}
@@ -130,30 +130,38 @@ release ステップは、すでに STALE になった lease（ジョブの実�
 
 ## 入力
 
-| 入力                            | `lock()`                     | 既定値                                |
-| ------------------------------- | ---------------------------- | ------------------------------------- |
-| `server-url`                    | —                            | `$LOCKABLE_RESOURCES_SERVER_URL`      |
-| `username`                      | —                            | `$LOCKABLE_RESOURCES_USERNAME`        |
-| `token`                         | —                            | 必須。環境変数からは読まない          |
-| `client-id`                     | —                            | `github-actions:<owner>/<repo>`       |
-| `resource`                      | `resource`                   |                                       |
-| `label`                         | `label`                      |                                       |
-| `group`                         | `group`                      |                                       |
-| `quantity`                      | `quantity`                   | `0`（合うものすべて）                 |
-| `variable`                      | `variable`                   |                                       |
-| `inverse-precedence`            | `inversePrecedence`          | `false`                               |
-| `resource-select-strategy`      | `resourceSelectStrategy`     | `SEQUENTIAL`                          |
-| `skip-if-locked`                | `skipIfLocked`               | `false`                               |
-| `extra`                         | `extra`                      | YAML または JSON のリスト             |
-| `priority`                      | `priority`                   | `0`                                   |
-| `timeout-for-allocate-resource` | `timeoutForAllocateResource` | `0`（無期限に待つ）                   |
-| `timeout-unit`                  | `timeoutUnit`                | `MINUTES`                             |
-| `reason`                        | `reason`                     | `<workflow> #<run> (<job>) <run URL>` |
+既定値と選択肢は lockable-resources 1611.vd91dca_329d61 時点のものです。選択肢の値は大文字・小文字を区別しません（`random` でも可）。
+
+| 入力                            | 既定値                                | 説明                                                                                                                                                                                                                                                                                  |
+| ------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **接続**                        |                                       |                                                                                                                                                                                                                                                                                       |
+| `server-url`                    | `$LOCKABLE_RESOURCES_SERVER_URL`      | Jenkins のルート URL。コンテキストパスまで含めます（例: `https://ci.example.com/jenkins`）。                                                                                                                                                                                          |
+| `username`                      | `$LOCKABLE_RESOURCES_USERNAME`        | **Overall/Read** と **Lockable Resources/RemoteUse** の権限を持つ Jenkins ユーザー。                                                                                                                                                                                                  |
+| `token`                         | （必須）                              | そのユーザーの API token（パスワードは不可）。secret から渡してください。環境変数からは読みません。                                                                                                                                                                                   |
+| **ロックする対象**              |                                       | `resource`・`label`・`group` のどれかを指定します（`extra` にすべて書いても可）。                                                                                                                                                                                                     |
+| `resource`                      |                                       | ロックするリソースの名前。Jenkins の _Lockable Resources_ ページにある名前です。リソースが存在し、公開ラベル（expose label）が付いている必要があります。パイプラインの `lock()` と違い、無いリソースは作られません。`label` とは併用できません。                                      |
+| `label`                         |                                       | 名前ではなくラベルでリソースを選びます。`gpu && linux` や `board-a \|\| board-b` のようなラベル式も使えます。対象は公開ラベルの付いたリソースだけです。いくつ取るかは `quantity` で指定します。`resource` とは併用できません。                                                        |
+| `quantity`                      | `0`                                   | `label`（または `group`）に合うリソースのうち、いくつロックするか。`0` は合うものを**すべて**ロックするので、全部が空くまで待ちます。プールから空いているものを 1 つ取るなら `1` にします。                                                                                           |
+| `group`                         | `common`                              | このリソースグループの中からだけ選びます（lockable-resources 1588 以降）。`resource` と `label` はグループの中で照合され、ほかのグループには広げません。`group` だけ（`resource` も `label` も無し）を指定するとグループ全体が対象になり、`quantity` はグループのメンバーを数えます。 |
+| `extra`                         |                                       | 同じ要求でまとめてロックする追加のリソース。全部取れるか、何も取らないかのどちらかです。YAML（または JSON）のリストで、各要素に `resource` か `label` と、必要なら `quantity`・`group` を書きます（`group` の無い要素はメインの `group` を使います）。下の例を参照。                  |
+| `resource-select-strategy`      | `SEQUENTIAL`                          | 必要な数より多く合うとき、空いているリソースのどれを取るか。`SEQUENTIAL`: Jenkins のリソース一覧の順。`RANDOM`: ランダムな順。                                                                                                                                                        |
+| **キューでの待ち方**            |                                       |                                                                                                                                                                                                                                                                                       |
+| `priority`                      | `0`                                   | 同じリソースを待つ要求の間の順番。数の大きいものから先に渡し、同じ数なら来た順です。負の数は既定の `0` より後になります。`inverse-precedence` とは併用できません。                                                                                                                    |
+| `inverse-precedence`            | `false`                               | `true`: 列に割り込みます。`true` の要求はほかの要求より先に渡され、`true` 同士では新しいものが先です。`priority` とは併用できません。                                                                                                                                                 |
+| `skip-if-locked`                | `false`                               | `true`: 待ちません。すぐにロックできなければ何もロックせず、出力 `acquired` を `false` にしてステップは成功します。後続のステップで確かめてください: `if: steps.<id>.outputs.acquired == 'true'`。                                                                                    |
+| `timeout-for-allocate-resource` | `0`                                   | この時間（単位は `timeout-unit`）待ってもロックできなければ諦め、ステップは `LOCK_WAIT_TIMEOUT` で失敗します。`0` は無期限に待ちます。指定を勧めます。待ち時間はジョブの時間上限と課金に含まれ、消えたランナーが残した要求も期限が来れば自然に消えます。                              |
+| `timeout-unit`                  | `MINUTES`                             | `timeout-for-allocate-resource` の単位: `SECONDS`、`MINUTES`、`HOURS`。Java の `TimeUnit` のほかの名前（`DAYS`、`MILLISECONDS` など）も使えますが、プラグインの文書にあるのはこの 3 つだけです。                                                                                      |
+| **ロック中**                    |                                       |                                                                                                                                                                                                                                                                                       |
+| `variable`                      |                                       | 後続のステップに渡す環境変数の名前。この変数にはロックしたリソースの名前がカンマ区切りで入り、`<variable>0`、`<variable>1`、… にはそれぞれの名前とプロパティが入ります（[出力と環境変数](#出力と環境変数)）。`GITHUB_` や `RUNNER_` で始まる名前は使えません。                        |
+| `reason`                        | `<workflow> #<run> (<job>) <run URL>` | ロック中、Jenkins の _Lockable Resources_ ページに表示されます。リソースがなぜ使用中か、ほかの人に分かるようにするためのものです。                                                                                                                                                    |
+| `client-id`                     | `github-actions:<owner>/<repo>`       | Jenkins のページでロックの横に表示され、どのクライアントが持っているかを示します。                                                                                                                                                                                                    |
 
 release ステップ（`/release`）は `lock-id` と、同じ `server-url`・`username`・`token` を取ります。
 
 Action が確かめるのは型と書式だけです。組み合わせが妥当か（`resource` と `label` の併用、`priority` と
 `inverse-precedence` の併用、対象なし）はサーバが判断し、ローカルの `lock()` と同じ文言で答えます。
+
+`extra` の例: メインの `resource` か `label` と一緒に、`resource4` と、ラベル `gpu` のリソース 2 つをロックします。
 
 ```yaml
 extra: |
@@ -161,9 +169,6 @@ extra: |
   - label: gpu
     quantity: 2
 ```
-
-`timeout-for-allocate-resource` は付けてください。待ち時間はジョブの時間上限と課金に含まれます。
-また、消えたランナーが残した要求も、期限が来れば自然に消えます。
 
 ## 出力と環境変数
 
@@ -183,9 +188,12 @@ Action はプロパティの値を表示しません。ただし runner は、`G
 
 ## 制限
 
-- ロックは 1 つのジョブの中だけで有効です。必要なジョブそれぞれでロックしてください。
-- 同じジョブで同じリソースを 2 回取ると、2 回目は 1 回目を待ち続けます（`shareId` がないため）。期限を付けてください。
-- `server-id`（peer mode）と `share-id` には対応していません。すべてのロックは設定した 1 台のサーバに行きます（delegated mode）。
+- ロックは job（`jobs:` の下の 1 項目）単位で有効です。
+  - job が終わると heartbeat は自動で止まります。それまでに job の中で release ステップを実行していなければ、
+    lease は STALE になります。
+  - ロックしたリソースを続けて占有して使うステップは、1 つの job にまとめてください。
+- `lock()` の引数のうち、remote API が受け付けないものには対応する入力がありません: `serverId`（すべてのロックは設定した
+  1 台のサーバに行きます。delegated mode と同じです）、`shareId`、1611 で増えた `candidates`・`onReleaseDelay`・`onCancelDelay`。
 
 ## うまくいかないとき
 
@@ -236,5 +244,5 @@ E2E テストには専用の Jenkins が要ります。[e2e/server/README.ja.md]
 ## ライセンス
 
 [MIT](LICENSE)。`dist/` のバンドルには他者のパッケージ（すべて MIT License）が含まれ、その著作権表示とライセンス文は
-[dist/licenses.txt](dist/licenses.txt) にある。このファイルは `npm run package` が作り直す。
-許可した寛容なライセンス（MIT、ISC、BSD、Apache-2.0）以外のパッケージが混ざるとビルドが失敗する。
+[dist/licenses.txt](dist/licenses.txt) にあります。このファイルは `npm run package` が作り直します。
+許可した寛容なライセンス（MIT、ISC、BSD、Apache-2.0）以外のパッケージが混ざると、ビルドが失敗します。

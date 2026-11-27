@@ -38,7 +38,7 @@ export class FakeRunner {
   }
 
   static create(): FakeRunner {
-    return new FakeRunner(fs.mkdtempSync(path.join(os.tmpdir(), 'lrrc-it-')))
+    return new FakeRunner(fs.mkdtempSync(path.join(os.tmpdir(), 'jlrc-it-')))
   }
 
   start(

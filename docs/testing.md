@@ -59,8 +59,8 @@ The design rests on runner behaviour that GitHub does not document. Before
 anything else it was checked with a small probe action
 (`.github/poc/m0-probe`) in `m0-poc.yml` and `m0-poc-cancel.yml`, by hand, on
 GitHub-hosted ubuntu, windows and macos runners
-([run 45711891191](https://github.com/kohtaro-satoh/lockable-resources-remote-client-actions/actions/runs/45711891191),
-[run 45711909304](https://github.com/kohtaro-satoh/lockable-resources-remote-client-actions/actions/runs/45711909304),
+([run 45711891191](https://github.com/kohtaro-satoh/jenkins-lockable-resources-connector/actions/runs/45711891191),
+[run 45711909304](https://github.com/kohtaro-satoh/jenkins-lockable-resources-connector/actions/runs/45711909304),
 2026-11-26). All six assumptions hold.
 
 | Assumption                                                                 | Result                                                                                                                                                         |
@@ -200,8 +200,8 @@ self-hosted runner on a public repository is a risk, so none is attached).
 
 | Plugin                        | Run                                                                                                           | Judge   |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------- | ------- |
-| 1611.vd91dca_329d61 (latest)  | [45732853249](https://github.com/kohtaro-satoh/lockable-resources-remote-client-actions/actions/runs/45732853249) | 77 / 77 |
-| 1560.va_b_cd589f23eb_         | [45733313311](https://github.com/kohtaro-satoh/lockable-resources-remote-client-actions/actions/runs/45733313311) | 77 / 77 |
+| 1611.vd91dca_329d61 (latest)  | [45732853249](https://github.com/kohtaro-satoh/jenkins-lockable-resources-connector/actions/runs/45732853249) | 77 / 77 |
+| 1560.va_b_cd589f23eb_         | [45733313311](https://github.com/kohtaro-satoh/jenkins-lockable-resources-connector/actions/runs/45733313311) | 77 / 77 |
 
 (2026-11-26.) A run takes about 3 minutes. On both versions the audit trail
 showed no resource held twice (76 events on 31 resources), and the priority
