@@ -8,6 +8,8 @@
 #   item 4  runs.using: node24 ................. every job (the probe is node24)
 #   item 5  container jobs ...................... job container
 #   item 6  composite wrapper's inner post ...... job composite
+#   item 7  post reads the job status ........... jobs status*; cancellation in
+#           m0-poc-cancel.yml
 name: M0 PoC
 
 on:
@@ -67,3 +69,108 @@ jobs:
       - name: Later step - is the daemon still alive?
         run: node .github/poc/m0-probe/check.mjs
       # Expect "M0 probe post" in this job's summary if the inner post ran.
+
+  # Item 7: what the post step reads from an input defaulting to the job.status
+  # expression. Read the "M0-STATUS ... OK / NG" lines (job summaries, or
+  # `gh run view <run> --log | grep M0-STATUS`). Several cases fail on purpose.
+  status:
+    name: status ${{ matrix.case }} (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        case: [success, failure]
+        include:
+          - { os: ubuntu-latest, case: continue-on-error }
+          - { os: ubuntu-latest, case: step-timeout }
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/poc/m0-status
+        with:
+          tag: ${{ matrix.case }}
+          expect: ${{ (matrix.case == 'failure' || matrix.case == 'step-timeout') && 'failure' || 'success' }}
+      - name: Fail
+        if: matrix.case == 'failure'
+        run: exit 1
+      - name: Fail, but continue
+        if: matrix.case == 'continue-on-error'
+        continue-on-error: true
+        run: exit 1
+      - name: Time out
+        if: matrix.case == 'step-timeout'
+        timeout-minutes: 1
+        run: sleep 120
+
+  status-job-timeout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/poc/m0-status
+        with:
+          tag: job-timeout
+          expect: cancelled
+      - run: sleep 180
+
+  status-container:
+    strategy:
+      fail-fast: false
+      matrix:
+        case: [success, failure]
+    runs-on: ubuntu-latest
+    container: node:24-bookworm-slim
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/poc/m0-status
+        with:
+          tag: container-${{ matrix.case }}
+          expect: ${{ matrix.case }}
+      - if: matrix.case == 'failure'
+        run: exit 1
+
+  # The probe inside a composite action: the failure can be inside it, after
+  # it, or swallowed by continue-on-error on the composite step.
+  status-composite:
+    name: status composite ${{ matrix.case }} (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        case: [success, fail-after]
+        include:
+          - { os: ubuntu-latest, case: fail-inside }
+          - { os: ubuntu-latest, case: fail-inside-continue }
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/poc/m0-status-composite
+        continue-on-error: ${{ matrix.case == 'fail-inside-continue' }}
+        with:
+          tag: composite-${{ matrix.case }}
+          expect: ${{ (matrix.case == 'fail-after' || matrix.case == 'fail-inside') && 'failure' || 'success' }}
+          fail-inside: ${{ startsWith(matrix.case, 'fail-inside') }}
+      - name: Fail after the composite action
+        if: matrix.case == 'fail-after'
+        run: exit 1
+
+  # Post steps run last-in, first-out: the second probe's post sees success and
+  # then fails; the first probe's post, run after it, should see failure.
+  status-post-chain:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/poc/m0-status
+        with:
+          tag: chain-first-lock-last-post
+          expect: failure
+      - uses: ./.github/poc/m0-status
+        with:
+          tag: chain-second-lock-first-post
+          expect: success
+          fail-post: 'true'

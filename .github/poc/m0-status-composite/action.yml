@@ -1,0 +1,22 @@
+name: M0 job status composite wrapper
+description: >-
+  Item 7 (docs/testing.md §3): the job status probe used inside a composite
+  action. Not part of the action.
+inputs:
+  tag:
+    required: true
+  expect:
+    required: true
+  fail-inside:
+    description: 'true: a step of the composite action fails after the probe.'
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/poc/m0-status
+      with:
+        tag: ${{ inputs.tag }}
+        expect: ${{ inputs.expect }}
+    - if: inputs.fail-inside == 'true'
+      shell: bash
+      run: exit 1

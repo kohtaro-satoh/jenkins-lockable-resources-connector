@@ -1,0 +1,22 @@
+name: M0 job status probe
+description: >-
+  Item 7 (docs/testing.md §3, M0): can the post step learn the job status from
+  an input whose default is the job.status expression? Not part of the action.
+inputs:
+  tag:
+    description: Name of the case, printed with the result.
+    required: true
+  expect:
+    description: The job status the post step should see.
+    required: true
+  fail-post:
+    description: 'true: the post step fails, after reporting.'
+    default: 'false'
+  job-status:
+    description: Do not set.
+    default: ${{ job.status }}
+runs:
+  using: node24
+  main: main.mjs
+  post: post.mjs
+  post-if: always()

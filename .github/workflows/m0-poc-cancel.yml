@@ -5,6 +5,8 @@
 #     to withdraw its request before it is killed
 # mode stubborn ignores the signals, so the runner has to kill main; post must
 # still run and read the state.
+# Item 7: the status jobs are cancelled while a later step runs; their post
+# should read job status "cancelled" (the "M0-STATUS" lines).
 name: M0 PoC (cancel)
 
 on:
@@ -26,6 +28,31 @@ jobs:
       - uses: ./.github/poc/m0-probe
         with:
           mode: ${{ matrix.mode }}
+
+  status:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/poc/m0-status
+        with:
+          tag: cancel
+          expect: cancelled
+      - run: sleep 900
+        shell: bash
+
+  status-composite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/poc/m0-status-composite
+        with:
+          tag: composite-cancel
+          expect: cancelled
+      - run: sleep 900
 
   cancel:
     runs-on: ubuntu-latest
